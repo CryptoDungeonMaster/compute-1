@@ -8,6 +8,7 @@ export type WorkerDoc = {
   adapter: string;
   cores: number | null;
   wallet: string | null;
+  name: string;
   authToken?: string;
   status: WorkerStatus;
   jobId: string | null;
@@ -29,6 +30,8 @@ export type JobDoc = {
   workerId: string | null;
   workerKind: WorkerKind | null;
   proof: string | null;
+  progress: number;
+  parallelism: number;
   createdAt: number;
   updatedAt: number;
 };

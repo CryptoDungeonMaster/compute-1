@@ -6,6 +6,13 @@ import { workerShare } from "@/lib/escrow";
 
 const STALE_MS = 20_000;
 const FILE = path.join(process.cwd(), ".data", "mesh.json");
+const ADJECTIVES = ["Amber", "Cobalt", "Juniper", "Nova", "Sable", "Solar", "Velvet", "Violet"];
+const NOUNS = ["Badger", "Falcon", "Kestrel", "Lynx", "Otter", "Raven", "Sparrow", "Tiger"];
+function workerName(id: string) {
+  let hash = 0;
+  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return `${ADJECTIVES[hash % ADJECTIVES.length]} ${NOUNS[(hash >>> 5) % NOUNS.length]}-${(hash % 97).toString().padStart(2, "0")}`;
+}
 
 type Snapshot = { workers: WorkerDoc[]; jobs: JobDoc[]; ledger: LedgerEntry[] };
 
@@ -99,6 +106,7 @@ function assign(jobs: JobDoc[], workers: WorkerDoc[], now = Date.now()) {
     job.status = "running";
     job.workerId = worker.id;
     job.workerKind = worker.kind;
+    job.progress = 5;
     job.updatedAt = now;
     const row = nextWorkers.find((w) => w.id === worker.id);
     if (row) {
@@ -143,7 +151,7 @@ export async function listJobs(): Promise<JobDoc[]> {
   });
 }
 
-export async function heartbeat(input: Omit<WorkerDoc, "status" | "jobId" | "heartbeat"> & { jobId?: string | null }) {
+export async function heartbeat(input: Omit<WorkerDoc, "name" | "status" | "jobId" | "heartbeat"> & { jobId?: string | null }) {
   const now = Date.now();
   const db = await mongoDb();
 
@@ -158,6 +166,7 @@ export async function heartbeat(input: Omit<WorkerDoc, "status" | "jobId" | "hea
       adapter: input.adapter,
       cores: input.cores,
       wallet: input.wallet,
+      name: existing?.name || workerName(input.id),
       authToken: input.authToken,
       status: existing?.status === "busy" && existing.jobId ? "busy" : "idle",
       jobId: existing?.status === "busy" ? existing.jobId : null,
@@ -184,6 +193,7 @@ export async function heartbeat(input: Omit<WorkerDoc, "status" | "jobId" | "hea
       adapter: input.adapter,
       cores: input.cores,
       wallet: input.wallet,
+      name: existing?.name || workerName(input.id),
       authToken: input.authToken,
       status: existing?.status === "busy" && existing.jobId ? "busy" : "idle",
       jobId: existing?.status === "busy" ? existing.jobId : null,
@@ -231,7 +241,7 @@ export async function removeWorker(id: string) {
   });
 }
 
-export async function createJob(input: Omit<JobDoc, "id" | "status" | "workerId" | "workerKind" | "proof" | "createdAt" | "updatedAt">) {
+export async function createJob(input: Omit<JobDoc, "id" | "status" | "workerId" | "workerKind" | "proof" | "progress" | "parallelism" | "createdAt" | "updatedAt">) {
   const now = Date.now();
   const job: JobDoc = {
     ...input,
@@ -240,6 +250,8 @@ export async function createJob(input: Omit<JobDoc, "id" | "status" | "workerId"
     workerId: null,
     workerKind: null,
     proof: null,
+    progress: 0,
+    parallelism: 1,
     createdAt: now,
     updatedAt: now,
   };
@@ -278,7 +290,7 @@ async function assignMongo(db: Db, now: number) {
     if (!worker) break;
     await db.collection("jobs").updateOne(
       { id: job.id },
-      { $set: { status: "running", workerId: worker.id, workerKind: worker.kind, updatedAt: now } },
+      { $set: { status: "running", workerId: worker.id, workerKind: worker.kind, progress: 5, updatedAt: now } },
     );
     await db.collection("workers").updateOne(
       { id: worker.id },
@@ -336,6 +348,7 @@ export async function completeJob(input: { jobId: string; workerId: string; auth
     }
     job.status = "done";
     job.proof = input.proof;
+    job.progress = 100;
     job.updatedAt = now;
     if (worker) {
       worker.status = "idle";
@@ -364,7 +377,7 @@ export async function completeJob(input: { jobId: string; workerId: string; auth
     }
     await db.collection("jobs").updateOne(
       { id: job.id },
-      { $set: { status: "done", proof: input.proof, updatedAt: now } },
+      { $set: { status: "done", proof: input.proof, progress: 100, updatedAt: now } },
     );
     await db.collection("workers").updateOne(
       { id: input.workerId },

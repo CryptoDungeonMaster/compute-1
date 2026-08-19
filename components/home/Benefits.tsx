@@ -9,7 +9,7 @@ const ITEMS = [
   },
   {
     title: "Two rails",
-    copy: "Workers earn TP and SOL. Requesters may pay with either. TP carries a protocol discount.",
+    copy: "Workers earn SOL after verified completion. Requesters fund work in SOL through escrow.",
   },
   {
     title: "Escrow first",

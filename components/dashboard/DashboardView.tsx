@@ -6,6 +6,7 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button, EmptyState, Panel, Section, StatusPill } from "@/components/ui";
 import { useMesh } from "@/components/MeshProvider";
 import { shortenAddress } from "@/lib/utils";
+import type { Earnings } from "@/lib/types";
 
 const SETTINGS_KEY = "tappower.settings";
 
@@ -28,6 +29,7 @@ export function DashboardView() {
   const { setVisible } = useWalletModal();
   const { jobs } = useMesh();
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
+  const [earnings, setEarnings] = useState<Earnings | null>(null);
 
   useEffect(() => {
     try {
@@ -37,6 +39,12 @@ export function DashboardView() {
       /* keep defaults */
     }
   }, []);
+
+  useEffect(() => {
+    if (!publicKey) return;
+    const load = async () => { const response = await fetch(`/api/earnings?wallet=${publicKey.toBase58()}`); const data = await response.json(); if (response.ok) setEarnings(data.earnings); };
+    load();
+  }, [publicKey]);
 
   const write = (next: Settings) => {
     setSettings(next);
@@ -69,9 +77,9 @@ export function DashboardView() {
 
       <Section className="pt-2">
         <div className="grid gap-4 md:grid-cols-4">
-          <Stat label="Earned" value="0 TP" hint="0 SOL" />
-          <Stat label="Spent" value="0 SOL" hint="0 TP" />
-          <Stat label="Claimable" value="0 TP" hint="0 SOL" />
+          <Stat label="Earned" value={`${((earnings?.lifetimeLamports || 0) / 1e9).toFixed(4)} SOL`} hint="Verified work" />
+          <Stat label="Spent" value="SOL" hint="See paid jobs below" />
+          <Stat label="Claimable" value={`${((earnings?.availableLamports || 0) / 1e9).toFixed(4)} SOL`} hint="Ready to claim" />
           <Stat
             label="Active jobs"
             value={String(jobs.filter((j) => j.status !== "done").length)}
@@ -145,10 +153,7 @@ export function DashboardView() {
 
         <Panel className="mt-4">
           <h2 className="font-display text-2xl italic text-ivory">Transactions</h2>
-          <p className="mt-6 text-sm leading-relaxed text-stone">
-            No transactions. Escrow locks, payouts, and claims will list here
-            with signatures when they happen.
-          </p>
+          {!earnings?.entries.length ? <p className="mt-6 text-sm leading-relaxed text-stone">No settlement transactions for this wallet yet. Fund a job, complete it with a native executor, then claim it to create on-chain signatures.</p> : <ul className="mt-6 divide-y divide-ivory/10 border-y border-ivory/10">{earnings.entries.map((entry) => <li key={entry.id} className="py-3 text-sm"><span className="text-ivory">{entry.kind === "credit" ? "Work credited" : "SOL claimed"}</span><span className="ml-3 text-stone">{(entry.lamports / 1e9).toFixed(4)} SOL</span>{entry.sig ? <a className="ml-3 text-gold hover:text-ivory" target="_blank" rel="noreferrer" href={`https://explorer.solana.com/tx/${entry.sig}`}>View signature</a> : null}</li>)}</ul>}
         </Panel>
       </Section>
     </div>

@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Tap Power. Turn a quiet tab into power",
     description:
-      "Decentralized browser compute on Solana. Share a tab. Earn TP + SOL. Rent the mesh. No downloads.",
+    "Solana-funded compute coordination. Share a worker, earn SOL, or rent approved compute.",
     images: ["/hero.jpg"],
     type: "website",
   },

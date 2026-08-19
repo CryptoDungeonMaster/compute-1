@@ -63,7 +63,7 @@ The current escrow model is custodial: the server holding `ESCROW_SECRET_KEY` ca
 2. Write a plain description of the task.
 3. Paste a Hugging Face ID such as `meta-llama/Llama-3.1-8B-Instruct`, or a direct model URL. This field is optional because some executors may use a preinstalled model.
 4. Optionally upload a small input file (maximum 1 MB). The file is stored with the job record so a native executor can read it from `TAP_POWER_JOB`.
-5. Enter the SOL budget. TP is not a payment option.
+5. Enter the SOL budget. SOL is the only payment and settlement currency.
 6. Click **Pay SOL & post job** and approve the wallet transaction.
 
 The server verifies the transaction destination and amount before inserting the job. The job board updates every two seconds. “Waiting” means no eligible worker has received it; “Working” means a worker owns it; “Complete” means the worker completion endpoint accepted a proof.
@@ -124,7 +124,7 @@ When the configured native executor succeeds, the worker script calls the comple
 
 The Earn screen updates the following values from that ledger:
 
-- **Available**: SOL that is ready to claim, plus a displayed TP balance of `0 TP` because TP is not used for settlement.
+- **Available**: SOL that is ready to claim.
 - **Earned today**: SOL credits created since local midnight.
 - **Lifetime**: all SOL credits and completed-job count.
 - **Claim**: sends available SOL from escrow to the connected worker address and stores the transaction signature as a payout record.
