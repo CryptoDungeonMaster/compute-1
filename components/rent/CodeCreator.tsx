@@ -1,0 +1,12 @@
+"use client";
+import { useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { Braces } from "lucide-react";
+import { Button, Panel } from "@/components/ui";
+import { useMesh } from "@/components/MeshProvider";
+export function CodeCreator() {
+  const { connected } = useWallet(); const { setVisible } = useWalletModal(); const { submitJob } = useMesh(); const [prompt, setPrompt] = useState(""); const [budget, setBudget] = useState("0.01"); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
+  const submit = async () => { if (!connected) { setVisible(true); return; } if (!prompt.trim()) return; setBusy(true); setMessage("Confirm the SOL payment to send this coding task to Qwen Coder."); const result = await submitJob({ prompt: `Code task. Return code in fenced blocks, explain how to run it, and keep changes focused.\n\n${prompt}`, modelSource: "lemonade:Qwen3-Coder-Next-GGUF", budget }); setBusy(false); if (result.error) setMessage(result.error); else { setPrompt(""); setMessage("Coding job posted to the managed Qwen Coder worker."); } };
+  return <Panel className="mt-4"><div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Code creator</p><h2 className="mt-2 font-display text-2xl italic text-ivory">Build with Qwen Coder</h2></div><Braces className="text-gold" size={24}/></div><p className="mt-3 max-w-2xl text-sm leading-relaxed text-stone">Send a focused coding request to the local Lemonade worker. It returns code and run instructions; it does not directly edit a renter’s files.</p><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={4} placeholder="Example: Create a TypeScript utility that validates a Solana address, with tests." className="mt-6 w-full resize-none border border-ivory/10 bg-transparent px-4 py-3 text-sm text-ivory outline-none placeholder:text-stone/50 focus:border-gold/50"/><div className="mt-3 flex flex-wrap items-center gap-3"><input value={budget} onChange={(event) => setBudget(event.target.value)} inputMode="decimal" aria-label="SOL budget" className="w-28 border border-ivory/10 bg-transparent px-3 py-2 text-sm text-ivory outline-none"/><span className="text-xs text-stone">SOL budget · Qwen3-Coder-Next-GGUF</span><Button onClick={submit} disabled={busy || !prompt.trim()}>{busy ? "Waiting for wallet" : "Create code"}</Button></div>{message ? <p className="mt-3 text-sm text-stone">{message}</p> : null}</Panel>;
+}

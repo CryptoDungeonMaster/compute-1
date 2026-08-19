@@ -84,7 +84,8 @@ async function runJob(job) {
     console.log("  Waiting: set TAP_POWER_EXECUTOR before this worker can run and settle jobs.");
     return;
   }
-  const result = spawnSync(EXECUTOR, [], {
+  const isNodeScript = EXECUTOR.endsWith(".mjs") || EXECUTOR.endsWith(".js");
+  const result = spawnSync(isNodeScript ? process.execPath : EXECUTOR, isNodeScript ? [EXECUTOR] : [], {
     env: { ...process.env, TAP_POWER_JOB: JSON.stringify(job) },
     encoding: "utf8",
     timeout: Number(process.env.TAP_POWER_TIMEOUT_MS || 1800000),

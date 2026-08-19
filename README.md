@@ -118,6 +118,20 @@ Your runner should parse that JSON, enforce its own allowed-model and resource p
 
 Keep the runner narrow. Good runners accept a fixed approved set of model IDs and a structured prompt format. Do not turn arbitrary job text into a shell command. Treat model URLs and attached files as untrusted input.
 
+### Fast starter executor: Ollama
+
+The repository includes `tap-power-ollama-executor.mjs`. It runs a local, allow-listed Ollama model and is the quickest way to test real execution. First install Ollama, then download a model on each worker machine:
+
+```powershell
+ollama pull llama3.2:3b
+$env:TAP_POWER_OLLAMA_MODEL="llama3.2:3b"
+$env:TAP_POWER_ALLOWED_MODELS="llama3.2:3b"
+$env:TAP_POWER_EXECUTOR="C:\path\to\tap-power-ollama-executor.mjs"
+node .\tap-power-worker.mjs
+```
+
+The native worker recognizes `.mjs` executors and runs them with Node. Renters should request `ollama:llama3.2:3b`. The executor refuses any model not in `TAP_POWER_ALLOWED_MODELS`. The Windows quick-start downloader can configure this automatically after Ollama and the selected model are installed.
+
 ## Settlement and claims
 
 When the configured native executor succeeds, the worker script calls the completion endpoint. The server verifies that the job is currently assigned to that worker and that its private per-worker token matches the token registered at heartbeat time, records the proof, returns the worker to available, and credits the worker wallet in the database.
