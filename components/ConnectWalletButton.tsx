@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { Copy, LogOut, Wallet } from "lucide-react";
+import { Copy, LogOut } from "lucide-react";
 import { shortenAddress } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export function ConnectWalletButton({
-  label = "Connect Wallet",
+  label = "Connect",
   className,
 }: {
   label?: string;
@@ -30,12 +31,13 @@ export function ConnectWalletButton({
     return () => window.removeEventListener("mousedown", onClick);
   }, []);
 
+  const base =
+    "inline-flex h-10 items-center justify-center gap-2 border px-4 text-[11px] uppercase tracking-[0.18em] transition";
+
   if (!mounted) {
     return (
-      <button
-        className={`inline-flex h-10 items-center rounded-full bg-white/5 px-4 text-sm text-white/70 ring-1 ring-white/10 ${className ?? ""}`}
-      >
-        Connect Wallet
+      <button className={cn(base, "border-ivory/20 text-ivory/60", className)}>
+        Connect
       </button>
     );
   }
@@ -45,19 +47,9 @@ export function ConnectWalletButton({
       <button
         onClick={() => setVisible(true)}
         disabled={connecting}
-        className={`inline-flex items-center gap-2 rounded-full bg-accent-blue px-4 py-2 text-sm font-medium text-white shadow-glow transition hover:bg-[#2563eb] disabled:opacity-60 ${className ?? ""}`}
+        className={cn(base, "border-gold/50 text-gold hover:bg-gold/10 disabled:opacity-50", className)}
       >
-        <Wallet size={15} />
-        {connecting ? (
-          "Connecting…"
-        ) : label === "Connect Wallet" ? (
-          <>
-            <span className="md:hidden">Connect</span>
-            <span className="hidden md:inline">Connect Wallet</span>
-          </>
-        ) : (
-          label
-        )}
+        {connecting ? "Connecting" : label}
       </button>
     );
   }
@@ -68,32 +60,32 @@ export function ConnectWalletButton({
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-sm text-white ring-1 ring-white/10 transition hover:bg-white/10 ${className ?? ""}`}
+        className={cn(base, "border-ivory/20 text-ivory hover:border-gold/60", className)}
       >
-        <span className="h-1.5 w-1.5 rounded-full bg-accent-green shadow-[0_0_8px_#22C55E]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-gold" />
         {shortenAddress(address)}
       </button>
       {open ? (
-        <div className="absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0d] p-1 shadow-glass">
+        <div className="absolute right-0 z-50 mt-2 w-48 border border-ivory/15 bg-ink p-1">
           <button
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"
+            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-ivory/80 hover:bg-ivory/5"
             onClick={async () => {
               await navigator.clipboard.writeText(address);
               setCopied(true);
               setTimeout(() => setCopied(false), 1200);
             }}
           >
-            <Copy size={14} />
+            <Copy size={13} />
             {copied ? "Copied" : "Copy address"}
           </button>
           <button
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-white/80 hover:bg-white/5"
+            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-ivory/80 hover:bg-ivory/5"
             onClick={() => {
               setOpen(false);
               disconnect();
             }}
           >
-            <LogOut size={14} />
+            <LogOut size={13} />
             Disconnect
           </button>
         </div>

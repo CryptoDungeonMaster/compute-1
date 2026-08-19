@@ -2,9 +2,9 @@ import { PageShell } from "@/components/PageShell";
 import { TokenView } from "@/components/token/TokenView";
 
 export const metadata = {
-  title: "Token — TabPower",
+  title: "Token — Tap Power",
   description:
-    "How the TabPower PF token works with SOL: utility, payments, tokenomics, staking, and fee share.",
+    "How the Tap Power PF token works with SOL: utility, payments, allocation, staking, and fee share.",
 };
 
 export default function TokenPage() {

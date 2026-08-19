@@ -3,34 +3,15 @@ import { cn } from "@/lib/utils";
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cn("flex items-center gap-2.5", className)}>
-      <span className="relative grid h-8 w-8 place-items-center overflow-hidden rounded-xl bg-ink-900 ring-1 ring-white/10">
-        <span className="absolute inset-0 bg-gradient-to-br from-accent-blue/40 via-transparent to-accent-green/30" />
-        <svg
-          viewBox="0 0 24 24"
-          className="relative h-4.5 w-4.5 text-white"
-          width="18"
-          height="18"
-          fill="none"
-          aria-hidden
-        >
-          <path
-            d="M7 8.5h10a1.5 1.5 0 0 1 1.5 1.5v7A1.5 1.5 0 0 1 17 18.5H7A1.5 1.5 0 0 1 5.5 17V10A1.5 1.5 0 0 1 7 8.5Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          />
-          <path d="M8 6.5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          <path
-            d="M12 11.2v5.2M12 11.2l2.1 1.4M12 11.2 9.9 12.6"
-            stroke="#22C55E"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+    <Link href="/" className={cn("group flex items-center gap-3", className)}>
+      <span className="grid h-8 w-8 place-items-center border border-ivory/20">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+          <path d="M1 3.2h12" stroke="#C4A574" strokeWidth="1.1" />
+          <path d="M7 3.2v8.2" stroke="#EDE6D6" strokeWidth="1.1" />
         </svg>
       </span>
-      <span className="font-display text-[17px] font-semibold tracking-tight text-white">
-        Tab<span className="text-white/90">Power</span>
+      <span className="font-display text-[19px] font-light tracking-[0.04em] text-ivory">
+        Tap <span className="italic text-ivory/75">Power</span>
       </span>
     </Link>
   );

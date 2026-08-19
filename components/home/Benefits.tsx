@@ -1,46 +1,23 @@
 "use client";
 
-import { motion } from "framer-motion";
-import {
-  BadgeCheck,
-  Gauge,
-  Globe,
-  LockKeyhole,
-  Sparkles,
-  Timer,
-} from "lucide-react";
 import { Section, SectionHeading } from "@/components/ui";
 
-const BENEFITS = [
+const ITEMS = [
   {
     title: "Nothing to install",
-    copy: "Jobs compile down to WebGPU. If the tab can render a canvas, it can earn.",
-    icon: Sparkles,
+    copy: "Jobs compile to WebGPU. If the tab can paint a canvas, it can contribute.",
   },
   {
-    title: "Dual rewards",
-    copy: "Workers earn the PF token and a SOL stream. Requesters can pay with either.",
-    icon: BadgeCheck,
+    title: "Two rails",
+    copy: "Workers earn PF and SOL. Requesters may pay with either. PF carries a protocol discount.",
   },
   {
-    title: "Escrow by default",
-    copy: "Budget locks on Solana until results verify. No prepaid trust, no chargebacks.",
-    icon: LockKeyhole,
+    title: "Escrow first",
+    copy: "Budget locks on Solana until hashed results agree. Unused funds return. No prepaid trust.",
   },
   {
-    title: "Device-aware pricing",
-    copy: "High-VRAM tabs price higher. Economy workers pick up the long tail.",
-    icon: Gauge,
-  },
-  {
-    title: "Global matching",
-    copy: "The mesh routes work to the nearest capable tab so latency stays honest.",
-    icon: Globe,
-  },
-  {
-    title: "Minutes, not queues",
-    copy: "Burst inference and tile renders start as soon as a worker heartbeats.",
-    icon: Timer,
+    title: "Device-aware rates",
+    copy: "Capable adapters price higher. Lighter machines take the long tail.",
   },
 ];
 
@@ -48,26 +25,20 @@ export function Benefits() {
   return (
     <Section>
       <SectionHeading
-        eyebrow="Why TabPower"
-        title="Premium rails for idle silicon."
-        copy="Built to feel like a product, not a faucet. Clear pricing, verified output, and a wallet-native payout path."
+        eyebrow="Principles"
+        title="Quiet rails for idle silicon."
+        copy="Built as a product, not a faucet. Clear pricing, verified output, wallet-native settlement."
       />
-      <div className="mt-14 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {BENEFITS.map((item, i) => (
-          <motion.div
-            key={item.title}
-            initial={{ opacity: 0, y: 14 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.05 }}
-            className="glass group rounded-2xl p-6 transition hover:border-white/15"
-          >
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-accent-blue/10 text-accent-blue ring-1 ring-accent-blue/20">
-              <item.icon size={18} />
-            </div>
-            <h3 className="mt-5 font-display text-lg text-white">{item.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-white/55">{item.copy}</p>
-          </motion.div>
+      <div className="mt-16 grid gap-px bg-ivory/10 md:grid-cols-2">
+        {ITEMS.map((item) => (
+          <article key={item.title} className="bg-ink p-8 md:p-10">
+            <h3 className="font-display text-2xl font-light italic text-ivory">
+              {item.title}
+            </h3>
+            <p className="mt-4 max-w-sm text-sm leading-relaxed text-stone">
+              {item.copy}
+            </p>
+          </article>
         ))}
       </div>
     </Section>

@@ -1,20 +1,22 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Cormorant_Garamond, Outfit } from "next/font/google";
 import { Providers } from "@/app/providers";
 import { AmbientBackground } from "@/components/AmbientBackground";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { NetworkStatus } from "@/components/NetworkStatus";
+import { WebGpuStatus } from "@/components/WebGpuStatus";
 import "./globals.css";
 
-const inter = Inter({
+const sans = Outfit({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-sans",
   display: "swap",
 });
 
-const display = Space_Grotesk({
+const display = Cormorant_Garamond({
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600"],
+  style: ["normal", "italic"],
   variable: "--font-display",
   display: "swap",
 });
@@ -24,11 +26,11 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "TabPower — Turn Your Browser Into Income",
+  title: "Tap Power — Turn a quiet tab into power",
   description:
-    "Open a browser tab and rent out unused CPU/GPU. Earn a pump.fun token plus SOL, or pay to run AI inference, rendering, and data jobs on Solana via WebGPU.",
+    "Open a browser tab and share unused CPU/GPU. Earn a pump.fun token plus SOL, or pay to run AI inference, rendering, and data jobs on Solana via WebGPU.",
   openGraph: {
-    title: "TabPower — Turn Your Browser Into Income",
+    title: "Tap Power — Turn a quiet tab into power",
     description:
       "Decentralized browser compute on Solana. Share a tab. Earn PF + SOL. Rent the mesh. No downloads.",
     images: ["/hero.jpg"],
@@ -36,8 +38,8 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon.ico" },
       { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32" },
     ],
   },
 };
@@ -48,14 +50,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${display.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${sans.variable} ${display.variable}`} suppressHydrationWarning>
       <body className="font-sans antialiased">
         <Providers>
           <AmbientBackground />
           <Navbar />
           {children}
           <Footer />
-          <NetworkStatus />
+          <WebGpuStatus />
         </Providers>
       </body>
     </html>
