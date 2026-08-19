@@ -6,5 +6,8 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const workers = await listWorkers();
-  return NextResponse.json({ workers, mongo: usingMongo() });
+  const visible = workers.map((worker) =>
+    Object.fromEntries(Object.entries(worker).filter(([key]) => key !== "authToken")),
+  );
+  return NextResponse.json({ workers: visible, mongo: usingMongo() });
 }

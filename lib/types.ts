@@ -8,6 +8,7 @@ export type WorkerDoc = {
   adapter: string;
   cores: number | null;
   wallet: string | null;
+  authToken?: string;
   status: WorkerStatus;
   jobId: string | null;
   heartbeat: number;
@@ -18,7 +19,9 @@ export type JobDoc = {
   prompt: string;
   modelSource: string;
   fileName: string;
+  fileData: string | null;
   budget: string;
+  currency: "SOL";
   lamports: number;
   paySignature: string;
   wallet: string | null;

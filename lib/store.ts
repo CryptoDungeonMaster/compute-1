@@ -149,12 +149,16 @@ export async function heartbeat(input: Omit<WorkerDoc, "status" | "jobId" | "hea
 
   if (db) {
     const existing = (await db.collection("workers").findOne({ id: input.id })) as unknown as WorkerDoc | null;
+    if (existing?.authToken && existing.authToken !== input.authToken) {
+      throw new Error("Worker token does not match this worker id");
+    }
     const doc: WorkerDoc = {
       id: input.id,
       kind: input.kind,
       adapter: input.adapter,
       cores: input.cores,
       wallet: input.wallet,
+      authToken: input.authToken,
       status: existing?.status === "busy" && existing.jobId ? "busy" : "idle",
       jobId: existing?.status === "busy" ? existing.jobId : null,
       heartbeat: now,
@@ -171,12 +175,16 @@ export async function heartbeat(input: Omit<WorkerDoc, "status" | "jobId" | "hea
   return withFileLock(async () => {
     const data = await readFileStore();
     const existing = data.workers.find((w) => w.id === input.id);
+    if (existing?.authToken && existing.authToken !== input.authToken) {
+      throw new Error("Worker token does not match this worker id");
+    }
     const doc: WorkerDoc = {
       id: input.id,
       kind: input.kind,
       adapter: input.adapter,
       cores: input.cores,
       wallet: input.wallet,
+      authToken: input.authToken,
       status: existing?.status === "busy" && existing.jobId ? "busy" : "idle",
       jobId: existing?.status === "busy" ? existing.jobId : null,
       heartbeat: now,
@@ -223,7 +231,7 @@ export async function removeWorker(id: string) {
   });
 }
 
-export async function createJob(input: Omit<JobDoc, "id" | "status" | "workerId" | "workerKind" | "createdAt" | "updatedAt">) {
+export async function createJob(input: Omit<JobDoc, "id" | "status" | "workerId" | "workerKind" | "proof" | "createdAt" | "updatedAt">) {
   const now = Date.now();
   const job: JobDoc = {
     ...input,
@@ -231,6 +239,7 @@ export async function createJob(input: Omit<JobDoc, "id" | "status" | "workerId"
     status: "open",
     workerId: null,
     workerKind: null,
+    proof: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -308,26 +317,21 @@ export async function getEarnings(wallet: string): Promise<Earnings> {
   const db = await mongoDb();
   if (db) {
     const entries = (await db.collection("ledger").find({ wallet }).toArray()) as unknown as LedgerEntry[];
-    const jobsCompleted = await db.collection("jobs").countDocuments({
-      status: "done",
-      $or: [{ wallet }, { workerId: { $exists: true } }],
-    });
-    const doneAsWorker = await db.collection("jobs").countDocuments({ status: "done" });
-    return summarize(entries, wallet, doneAsWorker);
+    return summarize(entries, wallet, entries.filter((e) => e.kind === "credit").length);
   }
   return withFileLock(async () => {
     const data = await readFileStore();
-    const jobsCompleted = data.jobs.filter((j) => j.status === "done").length;
+    const jobsCompleted = data.ledger.filter((e) => e.wallet === wallet && e.kind === "credit").length;
     return summarize(data.ledger, wallet, jobsCompleted);
   });
 }
 
-export async function completeJob(input: { jobId: string; workerId: string; proof: string }) {
+export async function completeJob(input: { jobId: string; workerId: string; authToken: string; proof: string }) {
   const now = Date.now();
   const db = await mongoDb();
 
   const finish = (job: JobDoc, worker: WorkerDoc | undefined, ledger: LedgerEntry[]) => {
-    if (job.status !== "running" || job.workerId !== input.workerId) {
+    if (job.status !== "running" || job.workerId !== input.workerId || worker?.authToken !== input.authToken) {
       throw new Error("This worker is not assigned to that job");
     }
     job.status = "done";
@@ -355,7 +359,7 @@ export async function completeJob(input: { jobId: string; workerId: string; proo
     const job = (await db.collection("jobs").findOne({ id: input.jobId })) as unknown as JobDoc | null;
     if (!job) throw new Error("Job not found");
     const worker = (await db.collection("workers").findOne({ id: input.workerId })) as unknown as WorkerDoc | null;
-    if (job.status !== "running" || job.workerId !== input.workerId) {
+    if (job.status !== "running" || job.workerId !== input.workerId || worker?.authToken !== input.authToken) {
       throw new Error("This worker is not assigned to that job");
     }
     await db.collection("jobs").updateOne(
@@ -406,4 +410,3 @@ export async function recordPayout(entry: LedgerEntry) {
     await writeFileStore(data);
   });
 }
-

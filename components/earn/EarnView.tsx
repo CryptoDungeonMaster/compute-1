@@ -1,142 +1,29 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Download, Pause, Play } from "lucide-react";
 import { Button, Panel, Section, StatusPill } from "@/components/ui";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { useMesh } from "@/components/MeshProvider";
+import type { Earnings } from "@/lib/types";
+
+const zero: Earnings = { availableLamports: 0, earnedTodayLamports: 0, lifetimeLamports: 0, jobsCompleted: 0, entries: [] };
+const sol = (n: number) => (n / 1_000_000_000).toFixed(n ? 4 : 0);
 
 export function EarnView() {
-  const { connected } = useWallet();
-  const { setVisible } = useWalletModal();
-  const { device, sharing, startSharing, stopSharing, assignedJob } = useMesh();
-
-  const toggleShare = () => {
-    if (!connected) {
-      setVisible(true);
-      return;
-    }
-    if (sharing) stopSharing();
-    else startSharing();
-  };
-
-  return (
-    <div>
-      <section className="mx-auto max-w-page px-6 pb-10 pt-24 md:pt-32">
-        <p className="eyebrow">Provide</p>
-        <h1 className="mt-5 max-w-3xl font-display text-4xl font-light italic leading-[1.1] text-ivory md:text-6xl">
-          Share a tab, or run a worker on your PC.
-        </h1>
-        <p className="mt-6 max-w-xl text-lg leading-relaxed text-stone">
-          Browser WebGPU is one option. For a real GPU, download the native
-          worker and leave it running. Open jobs on the board are assigned to
-          idle machines.
-        </p>
-        <div className="mt-10 flex flex-wrap items-center gap-3">
-          <ConnectWalletButton label="Connect wallet" />
-          <Button variant={sharing ? "secondary" : "primary"} onClick={toggleShare}>
-            {sharing ? <Pause size={14} /> : <Play size={14} />}
-            {sharing ? "Stop browser share" : "Share this tab"}
-          </Button>
-          <a
-            href="/tap-power-worker.mjs"
-            download
-            className="inline-flex items-center justify-center gap-2 rounded-sm border border-ivory/20 px-5 py-2.5 text-[13px] uppercase tracking-[0.08em] text-ivory transition-colors hover:border-gold/70 hover:text-gold"
-          >
-            <Download size={14} />
-            Download PC worker
-          </a>
-        </div>
-      </section>
-
-      <Section className="pt-4">
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Panel>
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-2xl italic text-ivory">This tab</h2>
-              <StatusPill live={sharing}>{sharing ? "Sharing WebGPU" : "Idle"}</StatusPill>
-            </div>
-            <dl className="mt-8 space-y-5 text-sm">
-              <Row
-                label="WebGPU"
-                value={device ? (device.webgpu ? "Available" : "Unavailable") : "Reading"}
-              />
-              <Row label="Adapter" value={device?.label ?? "Reading"} />
-              <Row
-                label="Logical cores"
-                value={device?.cores != null ? String(device.cores) : "Unknown"}
-              />
-            </dl>
-            <p className="mt-8 text-sm leading-relaxed text-stone">
-              Keep this tab open while sharing. It shows up as a WebGPU worker
-              on Rent and takes an open job when idle.
-            </p>
-          </Panel>
-
-          <Panel>
-            <h2 className="font-display text-2xl italic text-ivory">PC worker</h2>
-            <p className="mt-3 text-sm leading-relaxed text-stone">
-              Uses NVIDIA via nvidia-smi when present, otherwise reports the
-              CPU. Run it anywhere Node is installed.
-            </p>
-            <pre className="mt-6 overflow-x-auto border border-ivory/10 p-4 text-xs leading-relaxed text-ivory/80">
-{`node tap-power-worker.mjs`}
-            </pre>
-            <p className="mt-4 text-xs leading-relaxed text-stone">
-              Optional: TAP_POWER_URL for your site origin, TAP_POWER_WALLET
-              for the Solana address to credit.
-            </p>
-          </Panel>
-        </div>
-
-        <Panel className="mt-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-2xl italic text-ivory">Work on this</h2>
-            <StatusPill live={Boolean(assignedJob)}>
-              {assignedJob ? "Assigned" : "Idle"}
-            </StatusPill>
-          </div>
-          {assignedJob ? (
-            <div className="mt-6">
-              <p className="text-sm text-ivory">{assignedJob.prompt}</p>
-              {assignedJob.modelSource ? (
-                <p className="mt-2 text-xs text-stone">{assignedJob.modelSource}</p>
-              ) : null}
-            </div>
-          ) : (
-            <p className="mt-6 text-sm text-stone">
-              When a job is on the board and this worker is idle, it is assigned
-              here automatically.
-            </p>
-          )}
-        </Panel>
-
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <Metric label="Available" value="0 TP" hint="0 SOL" />
-          <Metric label="Earned today" value="0 TP" hint="No settlements yet" />
-          <Metric label="Lifetime" value="0 TP" hint="No jobs completed" />
-        </div>
-      </Section>
-    </div>
-  );
+  const { connected, publicKey } = useWallet(); const { setVisible } = useWalletModal(); const { device, sharing, startSharing, stopSharing, assignedJob } = useMesh();
+  const [earnings, setEarnings] = useState<Earnings>(zero); const [claiming, setClaiming] = useState(false); const [claimMessage, setClaimMessage] = useState("");
+  useEffect(() => { if (!publicKey) { setEarnings(zero); return; } const load = async () => { const response = await fetch(`/api/earnings?wallet=${publicKey.toBase58()}`); const data = await response.json(); if (response.ok) setEarnings(data.earnings); }; load(); const timer = window.setInterval(load, 5000); return () => window.clearInterval(timer); }, [publicKey]);
+  const toggleShare = () => { if (!connected) { setVisible(true); return; } if (sharing) stopSharing(); else startSharing(); };
+  const claim = async () => { if (!publicKey) { setVisible(true); return; } setClaiming(true); const response = await fetch("/api/earnings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet: publicKey.toBase58() }) }); const data = await response.json(); setClaiming(false); setClaimMessage(response.ok ? `Sent: ${data.signature}` : data.error); if (response.ok) setEarnings(zero); };
+  return <div><section className="mx-auto max-w-page px-6 pb-10 pt-24 md:pt-32"><p className="eyebrow">Earn SOL</p><h1 className="mt-5 max-w-3xl font-display text-4xl font-light italic leading-[1.1] text-ivory md:text-6xl">Let an available machine take paid jobs.</h1><p className="mt-6 max-w-xl text-lg leading-relaxed text-stone">The easiest way is to share this browser tab. For real model work, download the PC worker, add one command, and keep it running.</p><div className="mt-10 flex flex-wrap items-center gap-3"><ConnectWalletButton label="Connect wallet"/><Button variant={sharing ? "secondary" : "primary"} onClick={toggleShare}>{sharing ? <Pause size={14}/> : <Play size={14}/>}{sharing ? "Stop sharing" : "Share this tab"}</Button><a href="/tap-power-worker.mjs" download className="inline-flex items-center justify-center gap-2 rounded-sm border border-ivory/20 px-5 py-2.5 text-[13px] uppercase tracking-[0.08em] text-ivory transition-colors hover:border-gold/70 hover:text-gold"><Download size={14}/>Download PC worker</a></div></section>
+    <Section className="pt-4"><Panel className="mb-4"><p className="eyebrow">How it works</p><div className="mt-4 grid gap-4 md:grid-cols-3 text-sm text-stone"><p><span className="text-gold">1.</span> Connect the wallet that should receive SOL.</p><p><span className="text-gold">2.</span> Share this tab or start the PC worker.</p><p><span className="text-gold">3.</span> Complete a paid job, then claim SOL.</p></div></Panel><div className="grid gap-4 lg:grid-cols-2"><Panel><div className="flex items-center justify-between"><h2 className="font-display text-2xl italic text-ivory">This machine</h2><StatusPill live={sharing}>{sharing ? "Sharing" : "Available"}</StatusPill></div><dl className="mt-8 space-y-5 text-sm"><Row label="WebGPU" value={device ? (device.webgpu ? "Available" : "Not available") : "Checking"}/><Row label="Adapter" value={device?.label ?? "Checking"}/><Row label="Logical cores" value={device?.cores != null ? String(device.cores) : "Unknown"}/><Row label="Status" value={sharing ? "Visible on Rent as a worker" : "Not sharing"}/></dl><p className="mt-8 text-sm leading-relaxed text-stone">Adapter details come from this browser. Keep this tab open while sharing so the Rent page can see you.</p></Panel>
+      <Panel><h2 className="font-display text-2xl italic text-ivory">Run the PC worker</h2><ol className="mt-5 space-y-3 text-sm leading-relaxed text-stone"><li><span className="text-gold">1.</span> Download the file.</li><li><span className="text-gold">2.</span> Open a terminal in its folder.</li><li><span className="text-gold">3.</span> Run the command below and leave it open.</li></ol><pre className="mt-6 overflow-x-auto border border-ivory/10 p-4 text-xs leading-relaxed text-ivory/80">node tap-power-worker.mjs</pre><p className="mt-4 text-xs leading-relaxed text-stone">To actually run models, set TAP_POWER_EXECUTOR to your local runner command. Without it, the worker safely receives jobs but will not mark them complete.</p></Panel></div>
+      <Panel className="mt-4"><div className="flex items-center justify-between"><h2 className="font-display text-2xl italic text-ivory">Current job</h2><StatusPill live={Boolean(assignedJob)}>{assignedJob ? "Assigned" : "Available"}</StatusPill></div>{assignedJob ? <div className="mt-6"><p className="text-sm text-ivory">{assignedJob.prompt}</p>{assignedJob.modelSource ? <p className="mt-2 text-xs text-stone">{assignedJob.modelSource}</p> : null}</div> : <p className="mt-6 text-sm text-stone">When a paid job is waiting, this available worker is assigned automatically.</p>}</Panel>
+      <div className="mt-4 grid gap-4 md:grid-cols-3"><Metric label="Available" value={`${sol(earnings.availableLamports)} SOL`} hint="0 TP"/><Metric label="Earned today" value={`${sol(earnings.earnedTodayLamports)} SOL`} hint={earnings.earnedTodayLamports ? "Updated after completion" : "No settlements yet"}/><Metric label="Lifetime" value={`${sol(earnings.lifetimeLamports)} SOL`} hint={earnings.jobsCompleted ? `${earnings.jobsCompleted} jobs completed` : "No jobs completed"}/></div>
+      <Panel className="mt-4"><div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="font-display text-2xl italic text-ivory">Claim</h2><p className="mt-2 text-sm text-stone">{earnings.availableLamports ? "Send available SOL to your connected address." : "Nothing to claim until verified work pays this address."}</p>{claimMessage ? <p className="mt-2 break-all text-xs text-stone">{claimMessage}</p> : null}</div><Button onClick={claim} disabled={!earnings.availableLamports || claiming}>{claiming ? "Sending" : "Claim SOL"}</Button></div></Panel></Section></div>;
 }
-
-function Metric({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <Panel>
-      <p className="text-[10px] uppercase tracking-[0.2em] text-stone">{label}</p>
-      <p className="mt-3 font-display text-3xl italic text-ivory">{value}</p>
-      <p className="mt-1 text-sm text-stone">{hint}</p>
-    </Panel>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-6 border-b border-ivory/10 pb-4 last:border-0 last:pb-0">
-      <dt className="text-stone">{label}</dt>
-      <dd className="max-w-[60%] text-right text-ivory">{value}</dd>
-    </div>
-  );
-}
+function Metric({ label, value, hint }: { label: string; value: string; hint: string }) { return <Panel><p className="text-[10px] uppercase tracking-[0.2em] text-stone">{label}</p><p className="mt-3 font-display text-3xl italic text-ivory">{value}</p><p className="mt-1 text-sm text-stone">{hint}</p></Panel>; }
+function Row({ label, value }: { label: string; value: string }) { return <div className="flex items-start justify-between gap-6 border-b border-ivory/10 pb-4 last:border-0 last:pb-0"><dt className="text-stone">{label}</dt><dd className="max-w-[60%] text-right text-ivory">{value}</dd></div>; }

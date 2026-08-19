@@ -11,15 +11,18 @@
  * Optional env:
  *   TAP_POWER_URL     site origin, default http://localhost:3000
  *   TAP_POWER_WALLET  Solana address to credit
+ *   TAP_POWER_EXECUTOR path to a local executable that receives the job in TAP_POWER_JOB
  */
 
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
 
 const BASE = (process.env.TAP_POWER_URL || "http://localhost:3000").replace(/\/$/, "");
 const WALLET = process.env.TAP_POWER_WALLET || null;
 const ID = process.env.TAP_POWER_WORKER_ID || `native-${randomUUID()}`;
+const AUTH_TOKEN = process.env.TAP_POWER_WORKER_TOKEN || randomUUID();
+const EXECUTOR = process.env.TAP_POWER_EXECUTOR || null;
 
 function gpuName() {
   try {
@@ -42,6 +45,7 @@ console.log(`Tap Power native worker`);
 console.log(`  id      ${ID}`);
 console.log(`  adapter ${adapter}`);
 console.log(`  mesh    ${BASE}`);
+console.log(`  runner  ${EXECUTOR || "not configured"}`);
 console.log(`Keep this process running. Ctrl+C to leave.`);
 
 async function beat() {
@@ -54,6 +58,7 @@ async function beat() {
       adapter,
       cores: os.cpus().length,
       wallet: WALLET,
+      authToken: AUTH_TOKEN,
     }),
   });
   if (!res.ok) {
@@ -74,6 +79,30 @@ async function leave() {
   }
 }
 
+async function runJob(job) {
+  if (!EXECUTOR) {
+    console.log("  Waiting: set TAP_POWER_EXECUTOR before this worker can run and settle jobs.");
+    return;
+  }
+  const result = spawnSync(EXECUTOR, [], {
+    env: { ...process.env, TAP_POWER_JOB: JSON.stringify(job) },
+    encoding: "utf8",
+    timeout: Number(process.env.TAP_POWER_TIMEOUT_MS || 1800000),
+  });
+  if (result.error || result.status !== 0) {
+    console.error(`  Runner failed: ${result.error?.message || result.stderr || `exit ${result.status}`}`);
+    return;
+  }
+  const proof = (result.stdout || "completed by local executor").trim().slice(0, 4000);
+  const response = await fetch(`${BASE}/api/jobs/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jobId: job.id, workerId: ID, authToken: AUTH_TOKEN, proof: proof || "completed by local executor" }),
+  });
+  if (!response.ok) throw new Error(`completion ${response.status}`);
+  console.log("  Complete. Settlement is available to claim.");
+}
+
 let lastJob = null;
 
 async function loop() {
@@ -84,6 +113,7 @@ async function loop() {
       console.log(`Assigned job ${job.id}`);
       console.log(`  ${job.prompt}`);
       if (job.modelSource) console.log(`  source ${job.modelSource}`);
+      await runJob(job);
     }
     if (!job && lastJob) {
       console.log("Idle. Waiting for the next open job.");

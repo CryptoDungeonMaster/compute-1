@@ -3,9 +3,9 @@
 import { Section } from "@/components/ui";
 
 const STEPS = [
-  { n: "1", title: "Connect a wallet" },
-  { n: "2", title: "Share a tab or run the PC worker" },
-  { n: "3", title: "Posted jobs go to idle workers" },
+  { n: "Rent", title: "Describe the job, choose a model, and pay its SOL budget into escrow." },
+  { n: "Earn", title: "Share a tab, or run the PC worker with your wallet address." },
+  { n: "Settle", title: "After the runner completes verified work, SOL becomes available to claim." },
 ];
 
 export function HowItWorks() {
