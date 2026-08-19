@@ -1,12 +1,13 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import { MongoClient, type Db } from "mongodb";
-import type { JobDoc, WorkerDoc } from "@/lib/types";
+import type { Earnings, JobDoc, LedgerEntry, WorkerDoc } from "@/lib/types";
+import { workerShare } from "@/lib/escrow";
 
 const STALE_MS = 20_000;
 const FILE = path.join(process.cwd(), ".data", "mesh.json");
 
-type Snapshot = { workers: WorkerDoc[]; jobs: JobDoc[] };
+type Snapshot = { workers: WorkerDoc[]; jobs: JobDoc[]; ledger: LedgerEntry[] };
 
 const globalStore = globalThis as typeof globalThis & {
   _tapMongo?: Db;
@@ -45,9 +46,10 @@ async function readFileStore(): Promise<Snapshot> {
     return {
       workers: Array.isArray(data.workers) ? data.workers : [],
       jobs: Array.isArray(data.jobs) ? data.jobs : [],
+      ledger: Array.isArray(data.ledger) ? data.ledger : [],
     };
   } catch {
-    return { workers: [], jobs: [] };
+    return { workers: [], jobs: [], ledger: [] };
   }
 }
 
@@ -120,7 +122,7 @@ export async function listWorkers(): Promise<WorkerDoc[]> {
     const data = await readFileStore();
     const workers = live(data.workers, now);
     const jobs = await reclaimStale(data.jobs, workers, now);
-    await writeFileStore({ workers, jobs });
+    await writeFileStore({ workers, jobs, ledger: data.ledger });
     return workers;
   });
 }
@@ -182,7 +184,7 @@ export async function heartbeat(input: Omit<WorkerDoc, "status" | "jobId" | "hea
     const workers = [...data.workers.filter((w) => w.id !== input.id), doc];
     const jobs = await reclaimStale(data.jobs, workers, now);
     const assigned = assign(jobs, workers, now);
-    await writeFileStore(assigned);
+    await writeFileStore({ ...assigned, ledger: data.ledger });
     const fresh = assigned.workers.find((w) => w.id === input.id) ?? doc;
     const job = fresh.jobId ? assigned.jobs.find((j) => j.id === fresh.jobId) ?? null : null;
     return { worker: fresh, job };
@@ -217,7 +219,7 @@ export async function removeWorker(id: string) {
     }
     const workers = data.workers.filter((w) => w.id !== id);
     const assigned = assign(jobs, workers, now);
-    await writeFileStore(assigned);
+    await writeFileStore({ ...assigned, ledger: data.ledger });
   });
 }
 
@@ -242,7 +244,7 @@ export async function createJob(input: Omit<JobDoc, "id" | "status" | "workerId"
     const data = await readFileStore();
     const jobs = [job, ...data.jobs];
     const assigned = assign(jobs, data.workers, now);
-    await writeFileStore(assigned);
+    await writeFileStore({ ...assigned, ledger: data.ledger });
     return assigned.jobs.find((j) => j.id === job.id) ?? job;
   });
 }
@@ -279,3 +281,129 @@ async function assignMongo(db: Db, now: number) {
 export function usingMongo() {
   return Boolean(uri());
 }
+
+function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function summarize(entries: LedgerEntry[], wallet: string, jobsCompleted: number): Earnings {
+  const mine = entries.filter((e) => e.wallet === wallet);
+  const credits = mine.filter((e) => e.kind === "credit");
+  const payouts = mine.filter((e) => e.kind === "payout");
+  const creditSum = credits.reduce((s, e) => s + e.lamports, 0);
+  const payoutSum = payouts.reduce((s, e) => s + e.lamports, 0);
+  const today = startOfToday();
+  return {
+    availableLamports: Math.max(0, creditSum - payoutSum),
+    earnedTodayLamports: credits.filter((e) => e.createdAt >= today).reduce((s, e) => s + e.lamports, 0),
+    lifetimeLamports: creditSum,
+    jobsCompleted,
+    entries: mine.sort((a, b) => b.createdAt - a.createdAt),
+  };
+}
+
+export async function getEarnings(wallet: string): Promise<Earnings> {
+  const db = await mongoDb();
+  if (db) {
+    const entries = (await db.collection("ledger").find({ wallet }).toArray()) as unknown as LedgerEntry[];
+    const jobsCompleted = await db.collection("jobs").countDocuments({
+      status: "done",
+      $or: [{ wallet }, { workerId: { $exists: true } }],
+    });
+    const doneAsWorker = await db.collection("jobs").countDocuments({ status: "done" });
+    return summarize(entries, wallet, doneAsWorker);
+  }
+  return withFileLock(async () => {
+    const data = await readFileStore();
+    const jobsCompleted = data.jobs.filter((j) => j.status === "done").length;
+    return summarize(data.ledger, wallet, jobsCompleted);
+  });
+}
+
+export async function completeJob(input: { jobId: string; workerId: string; proof: string }) {
+  const now = Date.now();
+  const db = await mongoDb();
+
+  const finish = (job: JobDoc, worker: WorkerDoc | undefined, ledger: LedgerEntry[]) => {
+    if (job.status !== "running" || job.workerId !== input.workerId) {
+      throw new Error("This worker is not assigned to that job");
+    }
+    job.status = "done";
+    job.proof = input.proof;
+    job.updatedAt = now;
+    if (worker) {
+      worker.status = "idle";
+      worker.jobId = null;
+    }
+    const payWallet = worker?.wallet;
+    if (payWallet && job.lamports > 0) {
+      ledger.push({
+        id: crypto.randomUUID(),
+        wallet: payWallet,
+        lamports: workerShare(job.lamports),
+        kind: "credit",
+        jobId: job.id,
+        sig: job.paySignature,
+        createdAt: now,
+      });
+    }
+  };
+
+  if (db) {
+    const job = (await db.collection("jobs").findOne({ id: input.jobId })) as unknown as JobDoc | null;
+    if (!job) throw new Error("Job not found");
+    const worker = (await db.collection("workers").findOne({ id: input.workerId })) as unknown as WorkerDoc | null;
+    if (job.status !== "running" || job.workerId !== input.workerId) {
+      throw new Error("This worker is not assigned to that job");
+    }
+    await db.collection("jobs").updateOne(
+      { id: job.id },
+      { $set: { status: "done", proof: input.proof, updatedAt: now } },
+    );
+    await db.collection("workers").updateOne(
+      { id: input.workerId },
+      { $set: { status: "idle", jobId: null } },
+    );
+    const payWallet = worker?.wallet;
+    if (payWallet && job.lamports > 0) {
+      await db.collection("ledger").insertOne({
+        id: crypto.randomUUID(),
+        wallet: payWallet,
+        lamports: workerShare(job.lamports),
+        kind: "credit",
+        jobId: job.id,
+        sig: job.paySignature,
+        createdAt: now,
+      });
+    }
+    await assignMongo(db, now);
+    return (await db.collection("jobs").findOne({ id: job.id })) as unknown as JobDoc;
+  }
+
+  return withFileLock(async () => {
+    const data = await readFileStore();
+    const job = data.jobs.find((j) => j.id === input.jobId);
+    if (!job) throw new Error("Job not found");
+    const worker = data.workers.find((w) => w.id === input.workerId);
+    finish(job, worker, data.ledger);
+    const assigned = assign(data.jobs, data.workers, now);
+    await writeFileStore({ ...assigned, ledger: data.ledger });
+    return job;
+  });
+}
+
+export async function recordPayout(entry: LedgerEntry) {
+  const db = await mongoDb();
+  if (db) {
+    await db.collection("ledger").insertOne(entry);
+    return;
+  }
+  await withFileLock(async () => {
+    const data = await readFileStore();
+    data.ledger.push(entry);
+    await writeFileStore(data);
+  });
+}
+
