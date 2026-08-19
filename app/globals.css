@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: #050505;
+  --blue: #3b82f6;
+  --green: #22c55e;
+  --purple: #a855f7;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: #f4f4f5;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  font-feature-settings: "ss01" on, "cv11" on;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+p {
+  overflow-wrap: break-word;
+}
+
+::selection {
+  background: rgba(59, 130, 246, 0.38);
+  color: #fff;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1f1f23;
+  border-radius: 999px;
+  border: 2px solid #050505;
+}
+
+* {
+  outline-color: rgba(59, 130, 246, 0.6);
+}
+
+@layer components {
+  .glass {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.045),
+      rgba(255, 255, 255, 0.015)
+    );
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 24px 80px -32px rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(22px);
+  }
+
+  .glass-strong {
+    background: linear-gradient(
+      180deg,
+      rgba(12, 12, 14, 0.92),
+      rgba(8, 8, 10, 0.88)
+    );
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(28px);
+  }
+
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: radial-gradient(ellipse at center, black 10%, transparent 72%);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #fff 0%, #93c5fd 45%, #22c55e 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-medium uppercase tracking-[0.22em] text-accent-blue;
+  }
+}
+
+.wallet-adapter-modal-wrapper {
+  background: rgba(5, 5, 5, 0.78) !important;
+  backdrop-filter: blur(16px);
+}
+
+.wallet-adapter-modal {
+  background: #0b0b0d !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65) !important;
+}
+
+.wallet-adapter-modal-title {
+  color: #f8fafc !important;
+  font-weight: 600 !important;
+}
+
+.wallet-adapter-modal-list li {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 12px !important;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background: transparent !important;
+}
+
+.wallet-adapter-button:not(.wallet-adapter-button-trigger):hover {
+  background: rgba(59, 130, 246, 0.12) !important;
+}
+
+.wallet-adapter-modal-button-close {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
