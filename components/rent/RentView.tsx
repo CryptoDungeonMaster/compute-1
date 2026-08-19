@@ -5,53 +5,48 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Lock, Upload } from "lucide-react";
 import { Button, Panel, Section, StatusPill } from "@/components/ui";
+import { useMesh } from "@/components/MeshProvider";
 import { cn } from "@/lib/utils";
-
-const TASKS = [
-  "AI Inference",
-  "Image Rendering",
-  "Data Processing",
-  "Custom Kernel",
-] as const;
 
 export function RentView() {
   const { connected } = useWallet();
   const { setVisible } = useWalletModal();
-  const [task, setTask] = useState<(typeof TASKS)[number]>("AI Inference");
+  const { workers, job, tabId, submitJob } = useMesh();
   const [prompt, setPrompt] = useState("");
-  const [currency, setCurrency] = useState<"SOL" | "PF">("SOL");
+  const [currency, setCurrency] = useState<"SOL" | "TP">("SOL");
   const [budget, setBudget] = useState("");
-  const [priority, setPriority] = useState<"Fast" | "Standard" | "Economy">(
-    "Standard",
-  );
   const [fileName, setFileName] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
 
   const submit = () => {
     if (!connected) {
       setVisible(true);
       return;
     }
-    setSubmitted(true);
+    if (!prompt.trim()) return;
+    submitJob({ prompt, budget, currency, fileName });
   };
+
+  const matchedWorkers = job
+    ? workers.filter((w) => job.workerIds.includes(w.id))
+    : [];
 
   return (
     <div>
       <section className="mx-auto max-w-page px-6 pb-10 pt-24 md:pt-32">
         <p className="eyebrow">Request</p>
         <h1 className="mt-5 max-w-3xl font-display text-4xl font-light italic leading-[1.1] text-ivory md:text-6xl">
-          Commission the mesh. Pay for verified work.
+          Run your model faster.
         </h1>
         <p className="mt-6 max-w-xl text-lg leading-relaxed text-stone">
-          Describe the job and lock a budget. Matching begins when workers are
-          online. Nothing is charged until escrow can settle.
+          Write the job in your own words. Open browser GPUs on the mesh share
+          the inference so your model finishes sooner.
         </p>
       </section>
 
       <Section className="pt-4">
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <Panel>
-            <h2 className="font-display text-2xl italic text-ivory">Compose a job</h2>
+            <h2 className="font-display text-2xl italic text-ivory">Your job</h2>
             <form
               className="mt-8 space-y-6"
               onSubmit={(e) => {
@@ -61,45 +56,22 @@ export function RentView() {
             >
               <label className="block">
                 <span className="text-[10px] uppercase tracking-[0.2em] text-stone">
-                  Task
-                </span>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  {TASKS.map((item) => (
-                    <button
-                      type="button"
-                      key={item}
-                      onClick={() => setTask(item)}
-                      className={cn(
-                        "border px-3 py-2.5 text-left text-sm transition",
-                        task === item
-                          ? "border-gold/60 text-ivory"
-                          : "border-ivory/10 text-stone hover:border-ivory/25",
-                      )}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </label>
-
-              <label className="block">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-stone">
-                  Instructions
+                  What should the mesh run
                 </span>
                 <textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  rows={5}
-                  placeholder="Describe the work. Be specific about output, size, and constraints."
+                  rows={7}
+                  placeholder="Example: Run my Llama 8B checkpoint on this batch of prompts and return tokens as fast as the open GPUs allow."
                   className="mt-2 w-full resize-none border border-ivory/10 bg-transparent px-4 py-3 text-sm text-ivory outline-none placeholder:text-stone/50 focus:border-gold/50"
                 />
               </label>
 
               <label className="block">
                 <span className="text-[10px] uppercase tracking-[0.2em] text-stone">
-                  Data
+                  Weights or data
                 </span>
-                <label className="mt-2 flex cursor-pointer items-center justify-between border border-dashed border-ivory/20 px-4 py-4 text-sm text-stone hover:border-gold/40">
+                <label className="mt-2 flex cursor-pointer items-center justify-between border border-ivory/20 px-4 py-4 text-sm text-stone hover:border-gold/40">
                   <span className="inline-flex items-center gap-2">
                     <Upload size={15} />
                     {fileName ?? "Attach a file"}
@@ -112,60 +84,38 @@ export function RentView() {
                 </label>
               </label>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-stone">
-                    Budget
-                  </span>
-                  <div className="mt-2 flex border border-ivory/10">
-                    <input
-                      value={budget}
-                      onChange={(e) => setBudget(e.target.value)}
-                      placeholder="0.00"
-                      inputMode="decimal"
-                      className="w-full bg-transparent px-4 py-2.5 text-sm text-ivory outline-none"
-                    />
-                    <div className="flex p-1">
-                      {(["SOL", "PF"] as const).map((c) => (
-                        <button
-                          type="button"
-                          key={c}
-                          onClick={() => setCurrency(c)}
-                          className={cn(
-                            "px-3 py-1.5 text-[11px] uppercase tracking-wider",
-                            currency === c ? "text-gold" : "text-stone",
-                          )}
-                        >
-                          {c}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </label>
-                <label className="block">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-stone">
-                    Priority
-                  </span>
-                  <div className="mt-2 grid grid-cols-3 border border-ivory/10">
-                    {(["Fast", "Standard", "Economy"] as const).map((item) => (
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-[0.2em] text-stone">
+                  Budget
+                </span>
+                <div className="mt-2 flex border border-ivory/10">
+                  <input
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                    placeholder="0.00"
+                    inputMode="decimal"
+                    className="w-full bg-transparent px-4 py-2.5 text-sm text-ivory outline-none"
+                  />
+                  <div className="flex p-1">
+                    {(["SOL", "TP"] as const).map((c) => (
                       <button
                         type="button"
-                        key={item}
-                        onClick={() => setPriority(item)}
+                        key={c}
+                        onClick={() => setCurrency(c)}
                         className={cn(
-                          "py-2.5 text-[11px] uppercase tracking-wider",
-                          priority === item ? "text-ivory" : "text-stone",
+                          "px-3 py-1.5 text-[11px] uppercase tracking-wider",
+                          currency === c ? "text-gold" : "text-stone",
                         )}
                       >
-                        {item}
+                        {c}
                       </button>
                     ))}
                   </div>
-                </label>
-              </div>
+                </div>
+              </label>
 
-              <Button type="submit" className="w-full py-3">
-                {connected ? "Queue job" : "Connect to queue"}
+              <Button type="submit" className="w-full py-3" disabled={!prompt.trim()}>
+                {connected ? "Send to workers" : "Connect to send"}
               </Button>
             </form>
           </Panel>
@@ -174,12 +124,33 @@ export function RentView() {
             <Panel>
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-2xl italic text-ivory">Workers</h2>
-                <StatusPill>None online</StatusPill>
+                <StatusPill live={workers.length > 0}>
+                  {workers.length === 0
+                    ? "None online"
+                    : `${workers.length} online`}
+                </StatusPill>
               </div>
-              <p className="mt-6 text-sm leading-relaxed text-stone">
-                No workers online. Machines will list here with adapter class
-                and price when providers are sharing.
-              </p>
+              {workers.length === 0 ? (
+                <p className="mt-6 text-sm leading-relaxed text-stone">
+                  No workers online. Open Earn, connect, and start sharing. This
+                  page will list that machine here.
+                </p>
+              ) : (
+                <ul className="mt-6 divide-y divide-ivory/10 border-y border-ivory/10">
+                  {workers.map((w) => (
+                    <li key={w.id} className="py-4">
+                      <p className="text-sm text-ivory">
+                        {w.adapter}
+                        {w.id === tabId ? " (this tab)" : ""}
+                      </p>
+                      <p className="mt-1 text-xs text-stone">
+                        {w.webgpu ? "WebGPU" : "CPU"}
+                        {w.cores != null ? ` · ${w.cores} cores` : ""}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </Panel>
 
             <Panel id="escrow">
@@ -190,7 +161,6 @@ export function RentView() {
                   <p className="mt-3 text-sm leading-relaxed text-stone">
                     Budget locks on Solana when a job starts. Workers are paid
                     only after hashed results agree. Unused budget returns.
-                    No funds move until the mesh can match.
                   </p>
                 </div>
               </div>
@@ -201,18 +171,28 @@ export function RentView() {
         <Panel className="mt-4">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-2xl italic text-ivory">Job status</h2>
-            <StatusPill live={submitted}>{submitted ? "Queued locally" : "No job"}</StatusPill>
+            <StatusPill live={job?.status === "matched"}>
+              {!job ? "No job" : job.status === "matched" ? "Matched" : "Waiting for workers"}
+            </StatusPill>
           </div>
-          {submitted ? (
+          {!job ? (
+            <p className="mt-5 text-sm text-stone">
+              Send a job after at least one tab is sharing. Status follows who
+              is actually online.
+            </p>
+          ) : job.status === "matched" ? (
             <p className="mt-5 text-sm leading-relaxed text-stone">
-              {task} is held as a local request
-              {budget ? ` for ${budget} ${currency}` : ""}. Matching and escrow
-              begin when workers are on the mesh. Nothing has been charged.
+              Your job is matched to {matchedWorkers.length} worker
+              {matchedWorkers.length === 1 ? "" : "s"}
+              {job.budget ? ` for ${job.budget} ${job.currency}` : ""}.
+              {matchedWorkers[0]
+                ? ` Running on ${matchedWorkers.map((w) => w.adapter).join(", ")}.`
+                : ""}
             </p>
           ) : (
-            <p className="mt-5 text-sm text-stone">
-              Submit a job to place a request. Status will reflect the chain,
-              not a simulation.
+            <p className="mt-5 text-sm leading-relaxed text-stone">
+              Waiting for a worker. Open Earn, connect, and start sharing. This
+              page matches as soon as a machine appears.
             </p>
           )}
         </Panel>

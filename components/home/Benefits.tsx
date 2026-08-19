@@ -9,14 +9,14 @@ const ITEMS = [
   },
   {
     title: "Two rails",
-    copy: "Workers earn PF and SOL. Requesters may pay with either. PF carries a protocol discount.",
+    copy: "Workers earn TP and SOL. Requesters may pay with either. TP carries a protocol discount.",
   },
   {
     title: "Escrow first",
     copy: "Budget locks on Solana until hashed results agree. Unused funds return. No prepaid trust.",
   },
   {
-    title: "Device-aware rates",
+    title: "Adapter based rates",
     copy: "Capable adapters price higher. Lighter machines take the long tail.",
   },
 ];
@@ -27,7 +27,7 @@ export function Benefits() {
       <SectionHeading
         eyebrow="Principles"
         title="Quiet rails for idle silicon."
-        copy="Built as a product, not a faucet. Clear pricing, verified output, wallet-native settlement."
+        copy="Built as a product, not a faucet. Clear pricing, verified output, wallet native settlement."
       />
       <div className="mt-16 grid gap-px bg-ivory/10 md:grid-cols-2">
         {ITEMS.map((item) => (

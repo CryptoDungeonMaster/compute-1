@@ -32,7 +32,7 @@ export function Hero() {
             into power.
           </h1>
           <p className="mt-7 w-full min-w-0 max-w-lg text-base leading-relaxed text-stone md:text-lg">
-            Open a browser. Share unused CPU and GPU. Earn PF and SOL — or pay
+            Open a browser. Share unused CPU and GPU. Earn TP and SOL, or pay
             to run inference, rendering, and data jobs across other people’s
             open tabs. Nothing to install.
           </p>

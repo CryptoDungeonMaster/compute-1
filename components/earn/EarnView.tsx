@@ -1,30 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Pause, Play } from "lucide-react";
 import { Button, Panel, Section, StatusPill } from "@/components/ui";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
-import { readDeviceInfo, type DeviceInfo } from "@/lib/device";
+import { useMesh } from "@/components/MeshProvider";
 
 export function EarnView() {
   const { connected } = useWallet();
   const { setVisible } = useWalletModal();
-  const [sharing, setSharing] = useState(false);
-  const [device, setDevice] = useState<DeviceInfo | null>(null);
+  const { device, sharing, startSharing, stopSharing } = useMesh();
 
-  useEffect(() => {
-    readDeviceInfo().then(setDevice);
-  }, []);
-
-  const startShare = () => {
+  const toggleShare = () => {
     if (!connected) {
       setVisible(true);
       return;
     }
-    if (device && !device.webgpu) return;
-    setSharing((v) => !v);
+    if (sharing) stopSharing();
+    else startSharing();
   };
 
   return (
@@ -35,16 +29,13 @@ export function EarnView() {
           Connect, leave the tab open, share what sits idle.
         </h1>
         <p className="mt-6 max-w-xl text-lg leading-relaxed text-stone">
-          This browser reports its own adapter. Earnings appear here only after
-          verified work settles to your wallet — never as placeholders.
+          This browser reports its own adapter. While you share, it appears on
+          the Rent page as a worker. Earnings show after verified work settles
+          to your wallet.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-3">
           <ConnectWalletButton label="Connect wallet" />
-          <Button
-            variant={sharing ? "secondary" : "primary"}
-            onClick={startShare}
-            disabled={!!device && !device.webgpu}
-          >
+          <Button variant={sharing ? "secondary" : "primary"} onClick={toggleShare}>
             {sharing ? <Pause size={14} /> : <Play size={14} />}
             {sharing ? "Stop sharing" : "Start sharing"}
           </Button>
@@ -53,9 +44,9 @@ export function EarnView() {
 
       <Section className="pt-4">
         <div className="grid gap-4 md:grid-cols-3">
-          <Metric label="Available" value="0 PF" hint="0 SOL" />
-          <Metric label="Earned today" value="0 PF" hint="No settlements yet" />
-          <Metric label="Lifetime" value="0 PF" hint="No jobs completed" />
+          <Metric label="Available" value="0 TP" hint="0 SOL" />
+          <Metric label="Earned today" value="0 TP" hint="No settlements yet" />
+          <Metric label="Lifetime" value="0 TP" hint="No jobs completed" />
         </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -67,18 +58,21 @@ export function EarnView() {
             <dl className="mt-8 space-y-5 text-sm">
               <Row
                 label="WebGPU"
-                value={device ? (device.webgpu ? "Available" : "Unavailable") : "Reading…"}
+                value={device ? (device.webgpu ? "Available" : "Unavailable") : "Reading"}
               />
-              <Row label="Adapter" value={device?.label ?? "Reading…"} />
+              <Row label="Adapter" value={device?.label ?? "Reading"} />
               <Row
                 label="Logical cores"
                 value={device?.cores != null ? String(device.cores) : "Unknown"}
               />
-              <Row label="Status" value={sharing ? "Waiting for jobs" : "Not sharing"} />
+              <Row
+                label="Status"
+                value={sharing ? "Visible on Rent as a worker" : "Not sharing"}
+              />
             </dl>
             <p className="mt-8 text-sm leading-relaxed text-stone">
-              Adapter details come from this browser. Utilization is not estimated.
-              When a job is assigned, progress will appear here.
+              Adapter details come from this browser. Keep this tab open while
+              sharing so the Rent page can see you.
             </p>
           </Panel>
 
@@ -89,7 +83,7 @@ export function EarnView() {
             </p>
             <div className="mt-8 border border-ivory/10 px-5 py-6">
               <p className="text-[10px] uppercase tracking-[0.2em] text-stone">Available</p>
-              <p className="mt-2 font-display text-3xl italic text-ivory">0 PF</p>
+              <p className="mt-2 font-display text-3xl italic text-ivory">0 TP</p>
               <p className="text-stone">0 SOL</p>
             </div>
             <Button className="mt-6 w-full" disabled>
@@ -114,7 +108,7 @@ export function EarnView() {
             </h2>
             <p className="mt-5 leading-relaxed text-stone">
               Jobs split across independent tabs. Outputs hash, compare, then
-              release from escrow. A mismatch pauses the outlier — it does not
+              release from escrow. A mismatch pauses the outlier. It does not
               drain the requester.
             </p>
           </div>

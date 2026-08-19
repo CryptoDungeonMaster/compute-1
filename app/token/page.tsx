@@ -2,9 +2,9 @@ import { PageShell } from "@/components/PageShell";
 import { TokenView } from "@/components/token/TokenView";
 
 export const metadata = {
-  title: "Token — Tap Power",
+  title: "Token · Tap Power",
   description:
-    "How the Tap Power PF token works with SOL: utility, payments, allocation, staking, and fee share.",
+    "How the Tap Power TP token works with SOL: utility, payments, staking, and fee share.",
 };
 
 export default function TokenPage() {

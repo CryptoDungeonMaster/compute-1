@@ -26,13 +26,13 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Tap Power — Turn a quiet tab into power",
+  title: "Tap Power. Turn a quiet tab into power",
   description:
     "Open a browser tab and share unused CPU/GPU. Earn a pump.fun token plus SOL, or pay to run AI inference, rendering, and data jobs on Solana via WebGPU.",
   openGraph: {
-    title: "Tap Power — Turn a quiet tab into power",
+    title: "Tap Power. Turn a quiet tab into power",
     description:
-      "Decentralized browser compute on Solana. Share a tab. Earn PF + SOL. Rent the mesh. No downloads.",
+      "Decentralized browser compute on Solana. Share a tab. Earn TP + SOL. Rent the mesh. No downloads.",
     images: ["/hero.jpg"],
     type: "website",
   },

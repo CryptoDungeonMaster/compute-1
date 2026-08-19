@@ -67,9 +67,9 @@ export function DashboardView() {
 
       <Section className="pt-2">
         <div className="grid gap-4 md:grid-cols-4">
-          <Stat label="Earned" value="0 PF" hint="0 SOL" />
-          <Stat label="Spent" value="0 SOL" hint="0 PF" />
-          <Stat label="Claimable" value="0 PF" hint="0 SOL" />
+          <Stat label="Earned" value="0 TP" hint="0 SOL" />
+          <Stat label="Spent" value="0 SOL" hint="0 TP" />
+          <Stat label="Claimable" value="0 TP" hint="0 SOL" />
           <Stat label="Active jobs" value="0" hint="None running" />
         </div>
 
