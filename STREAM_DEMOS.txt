@@ -1,0 +1,54 @@
+TAP POWER — EASY STREAM DEMOS
+
+HOW TO START
+1. Open Rent.
+2. Show the worker is Available.
+3. Pick one example below.
+4. Pay the small SOL budget.
+5. Show the job change from Waiting to Working to Complete.
+6. Show the worker result and claim screen.
+
+DEMO 1 — MAKE CODE
+Use Code Creator.
+Paste this:
+
+Make a TypeScript function called isValidSolanaAddress.
+It should return true or false.
+Also write five tests for it.
+
+Say on stream:
+“I am sending this task to my Qwen Coder worker. It writes the code, then the worker is paid after it finishes.”
+
+DEMO 2 — MAKE A REACT COMPONENT
+Use Code Creator.
+Paste this:
+
+Make a simple React and Tailwind card.
+Show a worker name, GPU name, online status, and jobs completed.
+
+DEMO 3 — QUICK AI
+Use the general AI worker when it is enabled.
+Paste this:
+
+Turn this into three bullet points:
+The render was fast and looked great, but I could not tell if the worker was still running.
+
+DEMO 4 — TURN TEXT INTO JSON
+Paste this:
+
+Read this sentence and return JSON with mood and action:
+“The app looks good but the job took too long.”
+
+DEMO 5 — IMAGE GENERATION (COMING SOON)
+When Image Generation is enabled, paste this:
+
+A glowing glass computer cube floating above black stone.
+Gold lighting. Premium product photo. No text.
+
+WHAT TO SAY ABOUT IMAGES
+“Image Generation is coming soon. My ComfyUI worker is installed and connected locally. I am finishing the image model and workflow before I turn on paid image jobs.”
+
+IMPORTANT
+- Do not say payment worked until a Solana signature appears.
+- Do not say the code changed someone’s files. The worker returns code text.
+- Show the job board each time: Waiting, Working, then Complete.
