@@ -2,7 +2,7 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { Pause, Play } from "lucide-react";
+import { Download, Pause, Play } from "lucide-react";
 import { Button, Panel, Section, StatusPill } from "@/components/ui";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { useMesh } from "@/components/MeshProvider";
@@ -10,7 +10,7 @@ import { useMesh } from "@/components/MeshProvider";
 export function EarnView() {
   const { connected } = useWallet();
   const { setVisible } = useWalletModal();
-  const { device, sharing, startSharing, stopSharing } = useMesh();
+  const { device, sharing, startSharing, stopSharing, assignedJob } = useMesh();
 
   const toggleShare = () => {
     if (!connected) {
@@ -26,34 +26,36 @@ export function EarnView() {
       <section className="mx-auto max-w-page px-6 pb-10 pt-24 md:pt-32">
         <p className="eyebrow">Provide</p>
         <h1 className="mt-5 max-w-3xl font-display text-4xl font-light italic leading-[1.1] text-ivory md:text-6xl">
-          Connect, leave the tab open, share what sits idle.
+          Share a tab, or run a worker on your PC.
         </h1>
         <p className="mt-6 max-w-xl text-lg leading-relaxed text-stone">
-          This browser reports its own adapter. While you share, it appears on
-          the Rent page as a worker. Earnings show after verified work settles
-          to your wallet.
+          Browser WebGPU is one option. For a real GPU, download the native
+          worker and leave it running. Open jobs on the board are assigned to
+          idle machines.
         </p>
         <div className="mt-10 flex flex-wrap items-center gap-3">
           <ConnectWalletButton label="Connect wallet" />
           <Button variant={sharing ? "secondary" : "primary"} onClick={toggleShare}>
             {sharing ? <Pause size={14} /> : <Play size={14} />}
-            {sharing ? "Stop sharing" : "Start sharing"}
+            {sharing ? "Stop browser share" : "Share this tab"}
           </Button>
+          <a
+            href="/tap-power-worker.mjs"
+            download
+            className="inline-flex items-center justify-center gap-2 rounded-sm border border-ivory/20 px-5 py-2.5 text-[13px] uppercase tracking-[0.08em] text-ivory transition-colors hover:border-gold/70 hover:text-gold"
+          >
+            <Download size={14} />
+            Download PC worker
+          </a>
         </div>
       </section>
 
       <Section className="pt-4">
-        <div className="grid gap-4 md:grid-cols-3">
-          <Metric label="Available" value="0 TP" hint="0 SOL" />
-          <Metric label="Earned today" value="0 TP" hint="No settlements yet" />
-          <Metric label="Lifetime" value="0 TP" hint="No jobs completed" />
-        </div>
-
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           <Panel>
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-2xl italic text-ivory">This machine</h2>
-              <StatusPill live={sharing}>{sharing ? "Sharing" : "Idle"}</StatusPill>
+              <h2 className="font-display text-2xl italic text-ivory">This tab</h2>
+              <StatusPill live={sharing}>{sharing ? "Sharing WebGPU" : "Idle"}</StatusPill>
             </div>
             <dl className="mt-8 space-y-5 text-sm">
               <Row
@@ -65,68 +67,55 @@ export function EarnView() {
                 label="Logical cores"
                 value={device?.cores != null ? String(device.cores) : "Unknown"}
               />
-              <Row
-                label="Status"
-                value={sharing ? "Visible on Rent as a worker" : "Not sharing"}
-              />
             </dl>
             <p className="mt-8 text-sm leading-relaxed text-stone">
-              Adapter details come from this browser. Keep this tab open while
-              sharing so the Rent page can see you.
+              Keep this tab open while sharing. It shows up as a WebGPU worker
+              on Rent and takes an open job when idle.
             </p>
           </Panel>
 
           <Panel>
-            <h2 className="font-display text-2xl italic text-ivory">Claim</h2>
+            <h2 className="font-display text-2xl italic text-ivory">PC worker</h2>
             <p className="mt-3 text-sm leading-relaxed text-stone">
-              Nothing to claim until verified work pays this address.
+              Uses NVIDIA via nvidia-smi when present, otherwise reports the
+              CPU. Run it anywhere Node is installed.
             </p>
-            <div className="mt-8 border border-ivory/10 px-5 py-6">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-stone">Available</p>
-              <p className="mt-2 font-display text-3xl italic text-ivory">0 TP</p>
-              <p className="text-stone">0 SOL</p>
-            </div>
-            <Button className="mt-6 w-full" disabled>
-              Claim rewards
-            </Button>
+            <pre className="mt-6 overflow-x-auto border border-ivory/10 p-4 text-xs leading-relaxed text-ivory/80">
+{`node tap-power-worker.mjs`}
+            </pre>
+            <p className="mt-4 text-xs leading-relaxed text-stone">
+              Optional: TAP_POWER_URL for your site origin, TAP_POWER_WALLET
+              for the Solana address to credit.
+            </p>
           </Panel>
         </div>
 
         <Panel className="mt-4">
-          <h2 className="font-display text-2xl italic text-ivory">History</h2>
-          <p className="mt-6 text-sm leading-relaxed text-stone">
-            No earnings yet. Completed jobs will list here with amounts,
-            signatures, and verification status.
-          </p>
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-2xl italic text-ivory">Work on this</h2>
+            <StatusPill live={Boolean(assignedJob)}>
+              {assignedJob ? "Assigned" : "Idle"}
+            </StatusPill>
+          </div>
+          {assignedJob ? (
+            <div className="mt-6">
+              <p className="text-sm text-ivory">{assignedJob.prompt}</p>
+              {assignedJob.modelSource ? (
+                <p className="mt-2 text-xs text-stone">{assignedJob.modelSource}</p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-6 text-sm text-stone">
+              When a job is on the board and this worker is idle, it is assigned
+              here automatically.
+            </p>
+          )}
         </Panel>
 
-        <div id="verify" className="mt-20 grid gap-10 lg:grid-cols-2">
-          <div>
-            <p className="eyebrow">Verification</p>
-            <h2 className="mt-4 font-display text-3xl font-light italic text-ivory md:text-4xl">
-              Redundant slices. Hashed results.
-            </h2>
-            <p className="mt-5 leading-relaxed text-stone">
-              Jobs split across independent tabs. Outputs hash, compare, then
-              release from escrow. A mismatch pauses the outlier. It does not
-              drain the requester.
-            </p>
-          </div>
-          <ul className="space-y-0 border-y border-ivory/10">
-            {[
-              "Kernels run in a sandboxed worker thread",
-              "Quorum of independent tabs per slice",
-              "Result hash posted on Solana before payout",
-              "Repeat mismatches pause the device",
-            ].map((line) => (
-              <li
-                key={line}
-                className="border-b border-ivory/10 py-4 text-sm text-ivory/80 last:border-b-0"
-              >
-                {line}
-              </li>
-            ))}
-          </ul>
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <Metric label="Available" value="0 TP" hint="0 SOL" />
+          <Metric label="Earned today" value="0 TP" hint="No settlements yet" />
+          <Metric label="Lifetime" value="0 TP" hint="No jobs completed" />
         </div>
       </Section>
     </div>

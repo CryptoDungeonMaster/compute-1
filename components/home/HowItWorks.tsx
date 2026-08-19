@@ -4,8 +4,8 @@ import { Section } from "@/components/ui";
 
 const STEPS = [
   { n: "1", title: "Connect a wallet" },
-  { n: "2", title: "Keep a tab open" },
-  { n: "3", title: "Earn TP and SOL" },
+  { n: "2", title: "Share a tab or run the PC worker" },
+  { n: "3", title: "Posted jobs go to idle workers" },
 ];
 
 export function HowItWorks() {

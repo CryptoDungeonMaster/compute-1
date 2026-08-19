@@ -8,135 +8,139 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { readDeviceInfo, type DeviceInfo } from "@/lib/device";
-import {
-  getTabId,
-  matchJob,
-  MESH_EVENT,
-  MeshJob,
-  MeshWorker,
-  readJob,
-  readWorkers,
-  SHARING_KEY,
-  writeJob,
-  writeWorkers,
-} from "@/lib/mesh";
+import type { JobDoc, WorkerDoc } from "@/lib/types";
 
 type MeshContextValue = {
   device: DeviceInfo | null;
   sharing: boolean;
-  workers: MeshWorker[];
-  job: MeshJob | null;
+  workers: WorkerDoc[];
+  jobs: JobDoc[];
+  assignedJob: JobDoc | null;
   tabId: string | null;
+  mongo: boolean;
   startSharing: () => void;
   stopSharing: () => void;
   submitJob: (input: {
     prompt: string;
+    modelSource: string;
     budget: string;
     currency: "SOL" | "TP";
-    fileName: string | null;
-  }) => void;
+  }) => Promise<void>;
 };
 
 const MeshContext = createContext<MeshContextValue | null>(null);
+const TAB_KEY = "tappower.tabId";
+const SHARE_KEY = "tappower.sharing";
+
+function tabId() {
+  let id = sessionStorage.getItem(TAB_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem(TAB_KEY, id);
+  }
+  return id;
+}
 
 export function MeshProvider({ children }: { children: React.ReactNode }) {
+  const { publicKey } = useWallet();
   const [device, setDevice] = useState<DeviceInfo | null>(null);
   const [sharing, setSharing] = useState(false);
-  const [workers, setWorkers] = useState<MeshWorker[]>([]);
-  const [job, setJob] = useState<MeshJob | null>(null);
-  const [tabId, setTabId] = useState<string | null>(null);
+  const [workers, setWorkers] = useState<WorkerDoc[]>([]);
+  const [jobs, setJobs] = useState<JobDoc[]>([]);
+  const [id, setId] = useState<string | null>(null);
+  const [mongo, setMongo] = useState(false);
 
-  const refresh = useCallback(() => {
-    const live = readWorkers();
-    setWorkers(live);
-    const current = readJob();
-    if (current && current.status === "waiting" && live.length > 0) {
-      const matched = matchJob(current, live);
-      writeJob(matched);
-      setJob(matched);
-      return;
-    }
-    setJob(current);
+  const wallet = publicKey?.toBase58() ?? null;
+  const assignedJob = jobs.find((j) => j.workerId === id && j.status === "running") ?? null;
+
+  const refresh = useCallback(async () => {
+    const [w, j] = await Promise.all([
+      fetch("/api/workers").then((r) => r.json()),
+      fetch("/api/jobs").then((r) => r.json()),
+    ]);
+    setWorkers(w.workers || []);
+    setJobs(j.jobs || []);
+    setMongo(Boolean(w.mongo || j.mongo));
   }, []);
 
   useEffect(() => {
-    setTabId(getTabId());
-    setSharing(localStorage.getItem(SHARING_KEY) === "1");
-    refresh();
+    setId(tabId());
+    setSharing(localStorage.getItem(SHARE_KEY) === "1");
     readDeviceInfo().then(setDevice);
-
-    const onChange = () => refresh();
-    window.addEventListener(MESH_EVENT, onChange);
-    window.addEventListener("storage", onChange);
-    const poll = window.setInterval(onChange, 1000);
-    return () => {
-      window.removeEventListener(MESH_EVENT, onChange);
-      window.removeEventListener("storage", onChange);
-      window.clearInterval(poll);
-    };
+    refresh();
+    const timer = window.setInterval(refresh, 2000);
+    return () => window.clearInterval(timer);
   }, [refresh]);
 
   useEffect(() => {
-    if (!sharing || !tabId || !device) return;
+    if (!sharing || !id || !device) return;
+    let stop = false;
 
-    const beat = () => {
-      const others = readWorkers().filter((w) => w.id !== tabId);
-      writeWorkers([
-        ...others,
-        {
-          id: tabId,
+    const beat = async () => {
+      await fetch("/api/workers/heartbeat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          kind: "webgpu",
           adapter: device.label,
           cores: device.cores,
-          webgpu: device.webgpu,
-          heartbeat: Date.now(),
-        },
-      ]);
+          wallet,
+        }),
+      });
+      if (!stop) await refresh();
     };
 
     beat();
-    const timer = window.setInterval(beat, 2500);
+    const timer = window.setInterval(beat, 3000);
+    const leave = () => {
+      stop = true;
+      navigator.sendBeacon?.(
+        "/api/workers/leave",
+        new Blob([JSON.stringify({ id })], { type: "application/json" }),
+      );
+    };
+    window.addEventListener("pagehide", leave);
     return () => {
       window.clearInterval(timer);
-      writeWorkers(readWorkers().filter((w) => w.id !== tabId));
+      window.removeEventListener("pagehide", leave);
     };
-  }, [sharing, tabId, device]);
+  }, [sharing, id, device, wallet, refresh]);
 
   const startSharing = useCallback(() => {
-    localStorage.setItem(SHARING_KEY, "1");
+    localStorage.setItem(SHARE_KEY, "1");
     setSharing(true);
   }, []);
 
   const stopSharing = useCallback(() => {
-    localStorage.removeItem(SHARING_KEY);
+    localStorage.removeItem(SHARE_KEY);
     setSharing(false);
-    if (tabId) writeWorkers(readWorkers().filter((w) => w.id !== tabId));
-  }, [tabId]);
+    if (id) {
+      fetch("/api/workers/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      }).then(refresh);
+    }
+  }, [id, refresh]);
 
   const submitJob = useCallback(
-    (input: {
+    async (input: {
       prompt: string;
+      modelSource: string;
       budget: string;
       currency: "SOL" | "TP";
-      fileName: string | null;
     }) => {
-      const live = readWorkers();
-      const next = matchJob(
-        {
-          prompt: input.prompt.trim(),
-          budget: input.budget.trim(),
-          currency: input.currency,
-          fileName: input.fileName,
-          workerIds: [],
-          status: "waiting",
-          createdAt: Date.now(),
-        },
-        live,
-      );
-      writeJob(next);
-      setJob(next);
+      await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...input, wallet }),
+      });
+      await refresh();
     },
-    [],
+    [wallet, refresh],
   );
 
   const value = useMemo(
@@ -144,13 +148,26 @@ export function MeshProvider({ children }: { children: React.ReactNode }) {
       device,
       sharing,
       workers,
-      job,
-      tabId,
+      jobs,
+      assignedJob,
+      tabId: id,
+      mongo,
       startSharing,
       stopSharing,
       submitJob,
     }),
-    [device, sharing, workers, job, tabId, startSharing, stopSharing, submitJob],
+    [
+      device,
+      sharing,
+      workers,
+      jobs,
+      assignedJob,
+      id,
+      mongo,
+      startSharing,
+      stopSharing,
+      submitJob,
+    ],
   );
 
   return <MeshContext.Provider value={value}>{children}</MeshContext.Provider>;
@@ -158,8 +175,6 @@ export function MeshProvider({ children }: { children: React.ReactNode }) {
 
 export function useMesh() {
   const ctx = useContext(MeshContext);
-  if (!ctx) {
-    throw new Error("useMesh must be used within MeshProvider");
-  }
+  if (!ctx) throw new Error("useMesh must be used within MeshProvider");
   return ctx;
 }

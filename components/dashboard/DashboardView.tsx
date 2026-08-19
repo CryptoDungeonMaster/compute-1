@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button, EmptyState, Panel, Section, StatusPill } from "@/components/ui";
+import { useMesh } from "@/components/MeshProvider";
 import { shortenAddress } from "@/lib/utils";
 
 const SETTINGS_KEY = "tappower.settings";
@@ -25,6 +26,7 @@ const DEFAULTS: Settings = {
 export function DashboardView() {
   const { connected, publicKey } = useWallet();
   const { setVisible } = useWalletModal();
+  const { jobs } = useMesh();
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
 
   useEffect(() => {
@@ -70,16 +72,36 @@ export function DashboardView() {
           <Stat label="Earned" value="0 TP" hint="0 SOL" />
           <Stat label="Spent" value="0 SOL" hint="0 TP" />
           <Stat label="Claimable" value="0 TP" hint="0 SOL" />
-          <Stat label="Active jobs" value="0" hint="None running" />
+          <Stat
+            label="Active jobs"
+            value={String(jobs.filter((j) => j.status !== "done").length)}
+            hint={jobs.length ? `${jobs.length} on the board` : "None posted"}
+          />
         </div>
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <Panel>
             <h2 className="font-display text-2xl italic text-ivory">Jobs</h2>
-            <p className="mt-6 text-sm leading-relaxed text-stone">
-              No jobs. Provider shares and requester work will appear here once
-              they exist on-chain.
-            </p>
+            {jobs.length === 0 ? (
+              <p className="mt-6 text-sm leading-relaxed text-stone">
+                Posted jobs appear here as soon as they hit the board.
+              </p>
+            ) : (
+              <ul className="mt-6 divide-y divide-ivory/10 border-y border-ivory/10">
+                {jobs.slice(0, 8).map((job) => (
+                  <li key={job.id} className="py-4">
+                    <p className="text-sm text-ivory">{job.prompt}</p>
+                    <p className="mt-1 text-xs text-stone">
+                      {job.status === "open"
+                        ? "Open"
+                        : job.status === "running"
+                          ? "In work"
+                          : "Done"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Panel>
 
           <Panel>
