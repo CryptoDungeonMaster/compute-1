@@ -10,6 +10,7 @@ import {
   clusterApiUrl,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
+import bs58 from "bs58";
 
 const FILE = path.join(process.cwd(), ".data", "escrow.json");
 const FEE_BPS = 250;
@@ -24,16 +25,31 @@ export function connection() {
   return new Connection(rpcUrl(), "confirmed");
 }
 
+function keypairFromSecret(value: string) {
+  const secret = value.trim().replace(/^['"]|['"]$/g, "");
+  let bytes: Uint8Array;
+  try {
+    const parsed = JSON.parse(secret) as unknown;
+    if (typeof parsed === "string") return keypairFromSecret(parsed);
+    if (!Array.isArray(parsed) || !parsed.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) throw new Error("not a byte array");
+    bytes = Uint8Array.from(parsed as number[]);
+  } catch {
+    try { bytes = bs58.decode(secret); } catch { throw new Error("ESCROW_SECRET_KEY must be a JSON byte array or a base58 Solana secret key"); }
+  }
+  if (bytes.length === 32) return Keypair.fromSeed(bytes);
+  if (bytes.length === 64) return Keypair.fromSecretKey(bytes);
+  throw new Error("ESCROW_SECRET_KEY must decode to 32 (seed) or 64 (secret-key) bytes");
+}
+
 export async function getEscrowKeypair() {
   if (globalEscrow._tapEscrow) return globalEscrow._tapEscrow;
   if (process.env.ESCROW_SECRET_KEY) {
-    const raw = JSON.parse(process.env.ESCROW_SECRET_KEY) as number[];
-    globalEscrow._tapEscrow = Keypair.fromSecretKey(Uint8Array.from(raw));
+    globalEscrow._tapEscrow = keypairFromSecret(process.env.ESCROW_SECRET_KEY);
     return globalEscrow._tapEscrow;
   }
+  if (process.env.VERCEL || process.env.NODE_ENV === "production") throw new Error("ESCROW_SECRET_KEY is missing from the server environment");
   try {
-    const raw = JSON.parse(await readFile(FILE, "utf8")) as number[];
-    globalEscrow._tapEscrow = Keypair.fromSecretKey(Uint8Array.from(raw));
+    globalEscrow._tapEscrow = keypairFromSecret(await readFile(FILE, "utf8"));
     return globalEscrow._tapEscrow;
   } catch {
     const kp = Keypair.generate();

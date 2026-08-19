@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     return NextResponse.json({ address: (await getEscrowPublicKey()).toBase58() });
-  } catch {
-    return NextResponse.json({ error: "Escrow is not configured." }, { status: 503 });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown configuration error";
+    return NextResponse.json({ error: "Escrow is not configured.", detail }, { status: 503 });
   }
 }

@@ -41,7 +41,7 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.example
 ESCROW_SECRET_KEY=[...a JSON Solana keypair byte array...]
 ```
 
-Do not commit `.env.local`. `ESCROW_SECRET_KEY` is a hot-wallet private key. Never name it `NEXT_PUBLIC_ESCROW_SECRET_KEY` or place it in client code.
+Do not commit `.env.local`. `ESCROW_SECRET_KEY` is a hot-wallet private key. It accepts either the JSON byte array commonly exported by Solana CLI wallets or a base58 secret key; never name it `NEXT_PUBLIC_ESCROW_SECRET_KEY` or place it in client code.
 
 ## Escrow setup
 
@@ -83,7 +83,9 @@ This creates a WebGPU worker heartbeat. It is useful for presence testing and fo
 
 ### Native PC worker
 
-Download `tap-power-worker.mjs`, install Node 18+, and run:
+On Windows, use **Windows quick start** on the Earn page. It downloads one launcher file; double-click it, enter the wallet address, and it downloads and starts the worker from your current site. Node 18+ is still required.
+
+To configure it manually, download `tap-power-worker.mjs`, install Node 18+, and run:
 
 ```powershell
 $env:TAP_POWER_URL="https://your-domain.example"
