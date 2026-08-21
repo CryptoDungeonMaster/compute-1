@@ -18,6 +18,7 @@ export async function POST(req: Request) {
       adapter: String(body.adapter || "Unknown adapter"),
       cores: typeof body.cores === "number" ? body.cores : null,
       capacityTflops: typeof body.capacityTflops === "number" && Number.isFinite(body.capacityTflops) ? Math.max(0, body.capacityTflops) : 0,
+      minimumRewardSol: typeof body.minimumRewardSol === "number" && Number.isFinite(body.minimumRewardSol) ? Math.max(0.01, body.minimumRewardSol) : 0.01,
       wallet: body.wallet ? String(body.wallet) : null,
       authToken,
     });

@@ -143,7 +143,7 @@ function assign(jobs: JobDoc[], workers: WorkerDoc[], now = Date.now()) {
     if (job.status !== "open" && job.status !== "running") continue;
     const ids = assignedIds(job);
     while (ids.length < (job.parallelism || 1)) {
-      const eligibleIndex = idle.findIndex((worker) => !ids.includes(worker.id) && (job.modelSource.startsWith("managed:") || worker.kind === "native"));
+      const eligibleIndex = idle.findIndex((worker) => !ids.includes(worker.id) && (job.modelSource.startsWith("managed:") || worker.kind === "native") && (worker.minimumRewardSol ?? 0.01) <= Number(job.budget));
       const worker = eligibleIndex >= 0 ? idle.splice(eligibleIndex, 1)[0] : undefined;
       if (!worker) break;
       ids.push(worker.id);
@@ -227,6 +227,7 @@ export async function heartbeat(input: Omit<WorkerDoc, "name" | "status" | "jobI
       adapter: input.adapter,
       cores: input.cores,
       capacityTflops: input.capacityTflops,
+      minimumRewardSol: input.minimumRewardSol,
       wallet: input.wallet,
       name: existing?.name || workerName(input.id),
       authToken: input.authToken,
@@ -255,6 +256,7 @@ export async function heartbeat(input: Omit<WorkerDoc, "name" | "status" | "jobI
       adapter: input.adapter,
       cores: input.cores,
       capacityTflops: input.capacityTflops,
+      minimumRewardSol: input.minimumRewardSol,
       wallet: input.wallet,
       name: existing?.name || workerName(input.id),
       authToken: input.authToken,
@@ -306,7 +308,7 @@ export async function removeWorker(id: string) {
   });
 }
 
-export async function createJob(input: Omit<JobDoc, "id" | "accessToken" | "status" | "workerId" | "workerIds" | "completedWorkerIds" | "workerKind" | "proof" | "progress" | "parallelism" | "estimatedDurationMs" | "startedAt" | "readyAt" | "createdAt" | "updatedAt">) {
+export async function createJob(input: Omit<JobDoc, "id" | "accessToken" | "status" | "workerId" | "workerIds" | "completedWorkerIds" | "workerKind" | "proof" | "result" | "progress" | "parallelism" | "estimatedDurationMs" | "startedAt" | "readyAt" | "createdAt" | "updatedAt">) {
   const now = Date.now();
   const job: JobDoc = {
     ...input,
@@ -318,6 +320,7 @@ export async function createJob(input: Omit<JobDoc, "id" | "accessToken" | "stat
     completedWorkerIds: [],
     workerKind: null,
     proof: null,
+    result: null,
     progress: 0,
     parallelism: recommendedParallelism(input.prompt, input.fileData),
     estimatedDurationMs: estimatedDuration(input.prompt),
@@ -363,7 +366,7 @@ async function assignMongoUnlocked(db: Db, now: number) {
   for (const job of active) {
     const ids = assignedIds(job);
     while (ids.length < (job.parallelism || 1)) {
-      const eligibleIndex = idle.findIndex((worker) => !ids.includes(worker.id) && (job.modelSource.startsWith("managed:") || worker.kind === "native"));
+      const eligibleIndex = idle.findIndex((worker) => !ids.includes(worker.id) && (job.modelSource.startsWith("managed:") || worker.kind === "native") && (worker.minimumRewardSol ?? 0.01) <= Number(job.budget));
       const worker = eligibleIndex >= 0 ? idle.splice(eligibleIndex, 1)[0] : undefined;
       if (!worker) break;
       const startedAt = job.startedAt || now;
@@ -421,7 +424,7 @@ export async function listLedger(): Promise<LedgerEntry[]> {
   return withFileLock(async () => (await readFileStore()).ledger.sort((a, b) => b.createdAt - a.createdAt));
 }
 
-export async function completeJob(input: { jobId: string; workerId: string; authToken: string; proof: string }) {
+export async function completeJob(input: { jobId: string; workerId: string; authToken: string; proof: string; result?: { kind: "text" | "image"; content: string } | null }) {
   const now = Date.now();
   const db = await mongoDb();
 
@@ -436,7 +439,7 @@ export async function completeJob(input: { jobId: string; workerId: string; auth
     const completed = Array.from(new Set([...completedIds(job), input.workerId]));
     const participants = assignedIds(job);
     const done = participants.every((id) => completed.includes(id));
-    await db.collection("jobs").updateOne({ id: job.id, status: "running" }, { $set: { status: done ? "done" : "running", completedWorkerIds: completed, proof: [job.proof, input.proof].filter(Boolean).join("\n---\n"), progress: done ? 100 : Math.max(10, Math.round((completed.length / participants.length) * 90)), updatedAt: now } });
+    await db.collection("jobs").updateOne({ id: job.id, status: "running" }, { $set: { status: done ? "done" : "running", completedWorkerIds: completed, proof: [job.proof, input.proof].filter(Boolean).join("\n---\n"), result: done && input.result ? input.result : job.result ?? null, progress: done ? 100 : Math.max(10, Math.round((completed.length / participants.length) * 90)), updatedAt: now } });
     await db.collection("workers").updateOne({ id: input.workerId, jobId: job.id }, { $set: { status: "idle", jobId: null } });
     if (done && job.lamports > 0) {
       const participantWorkers = (await db.collection("workers").find({ id: { $in: participants } }).toArray()) as unknown as WorkerDoc[];
@@ -456,7 +459,7 @@ export async function completeJob(input: { jobId: string; workerId: string; auth
     const participants = assignedIds(job);
     job.completedWorkerIds = Array.from(new Set([...completedIds(job), input.workerId]));
     const done = participants.every((id) => job.completedWorkerIds.includes(id));
-    job.status = done ? "done" : "running"; job.proof = [job.proof, input.proof].filter(Boolean).join("\n---\n"); job.progress = done ? 100 : Math.max(10, Math.round((job.completedWorkerIds.length / participants.length) * 90)); job.updatedAt = now;
+    job.status = done ? "done" : "running"; job.proof = [job.proof, input.proof].filter(Boolean).join("\n---\n"); if (done && input.result) job.result = input.result; job.progress = done ? 100 : Math.max(10, Math.round((job.completedWorkerIds.length / participants.length) * 90)); job.updatedAt = now;
     if (worker) { worker.status = "idle"; worker.jobId = null; }
     if (done && job.lamports > 0) {
       const participantWorkers = data.workers.filter((item) => participants.includes(item.id));
@@ -469,7 +472,7 @@ export async function completeJob(input: { jobId: string; workerId: string; auth
 }
 
 /** Completes hosted code/image work and credits the randomly assigned online worker. */
-export async function completeManagedJob(jobId: string, proof: string) {
+export async function completeManagedJob(jobId: string, proof: string, result: { kind: "text" | "image"; content: string }) {
   const now = Date.now();
   const db = await mongoDb();
   if (db) {
@@ -484,7 +487,7 @@ export async function completeManagedJob(jobId: string, proof: string) {
     if (!workers.some((worker) => worker.wallet)) throw new Error("Assigned workers have no payout wallet");
     const claimed = await db.collection("jobs").findOneAndUpdate(
       { id: job.id, status: "running" },
-      { $set: { status: "done", proof, completedWorkerIds: participants, progress: 100, updatedAt: now } },
+      { $set: { status: "done", proof, result, completedWorkerIds: participants, progress: 100, updatedAt: now } },
       { returnDocument: "after" },
     );
     if (!claimed) return (await db.collection("jobs").findOne({ id: job.id })) as unknown as JobDoc;
@@ -504,7 +507,7 @@ export async function completeManagedJob(jobId: string, proof: string) {
     if (job.readyAt && now < job.readyAt) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
     const workers = data.workers.filter((item) => participants.includes(item.id) && item.wallet);
     if (!workers.length) throw new Error("Assigned workers have no payout wallet");
-    job.status = "done"; job.proof = proof; job.completedWorkerIds = participants; job.progress = 100; job.updatedAt = now;
+    job.status = "done"; job.proof = proof; job.result = result; job.completedWorkerIds = participants; job.progress = 100; job.updatedAt = now;
     workers.forEach((worker) => { worker.status = "idle"; worker.jobId = null; });
     for (const allocation of payoutAllocations(workers, job.lamports)) if (!data.ledger.some((entry) => entry.kind === "credit" && entry.jobId === job.id && entry.wallet === allocation.wallet)) data.ledger.push({ id: crypto.randomUUID(), wallet: allocation.wallet, lamports: allocation.lamports, kind: "credit", jobId: job.id, sig: job.paySignature, createdAt: now });
     const assigned = assign(data.jobs, data.workers, now);

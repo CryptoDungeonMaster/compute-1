@@ -30,11 +30,11 @@ export async function POST(req: Request) {
     if (!allowAiRequest(ip)) return NextResponse.json({ error: "AI request limit reached. Try again in a few minutes." }, { status: 429 });
     if (kind === "code") {
       const result = await generateCode(prompt);
-      await completeManagedJob(job.id, `Managed code generation completed (${result.length} characters)`);
+      await completeManagedJob(job.id, `Managed code generation completed (${result.length} characters)`, { kind: "text", content: result });
       return NextResponse.json({ result, settled: true });
     }
     const result = await generateImage(prompt);
-    await completeManagedJob(job.id, "Managed image generation completed");
+    await completeManagedJob(job.id, "Managed image generation completed", { kind: "image", content: result.dataUrl });
     return NextResponse.json({ ...result, settled: true });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "AI request failed." }, { status: 500 });

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { Cpu, Shuffle, Upload, Vault } from "lucide-react";
+import { Cpu, Eye, LoaderCircle, Shuffle, Upload, Vault } from "lucide-react";
 import { Button, Panel, Section, StatusPill } from "@/components/ui";
 import { useMesh } from "@/components/MeshProvider";
 import { CodeCreator } from "@/components/rent/CodeCreator";
@@ -13,7 +14,7 @@ import type { JobDoc } from "@/lib/types";
 export function RentView() {
   const { connected } = useWallet();
   const { setVisible } = useWalletModal();
-  const { workers, jobs, tabId, submitJob } = useMesh();
+  const { workers, jobs, tabId, submitJob, getJobAccessToken } = useMesh();
   const [prompt, setPrompt] = useState("");
   const [modelSource, setModelSource] = useState("");
   const [budget, setBudget] = useState("0.01");
@@ -21,6 +22,9 @@ export function RentView() {
   const [fileData, setFileData] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [posting, setPosting] = useState(false);
+  const [result, setResult] = useState<{ job: JobDoc; value: { kind: "text" | "image"; content: string } } | null>(null);
+  const [resultMessage, setResultMessage] = useState("");
+  const [loadingResult, setLoadingResult] = useState<string | null>(null);
 
   const chooseFile = async (file?: File) => {
     if (!file) return;
@@ -37,6 +41,18 @@ export function RentView() {
     if (result.error) { setMessage(result.error); return; }
     setPrompt(""); setModelSource(""); setBudget("0.01"); setFileData(null); setFileName("");
     setMessage("Funded and posted. A compatible worker will be matched automatically.");
+  };
+  const viewResult = async (job: JobDoc) => {
+    const accessToken = getJobAccessToken(job.id);
+    if (!accessToken) return;
+    setLoadingResult(job.id); setResultMessage("");
+    try {
+      const response = await fetch(`/api/jobs/${job.id}/result?accessToken=${encodeURIComponent(accessToken)}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not load the completed result.");
+      setResult({ job, value: data.result });
+    } catch (error) { setResultMessage(error instanceof Error ? error.message : "Could not load the completed result."); }
+    finally { setLoadingResult(null); }
   };
 
   return <div>
@@ -63,14 +79,16 @@ export function RentView() {
         </form></Panel>
 
         <Panel><div className="flex items-center justify-between gap-3"><div><p className="eyebrow">Network</p><h2 className="mt-2 text-2xl font-medium tracking-[-.03em] text-ivory">Workers online</h2></div><StatusPill live={workers.length > 0}>{workers.length ? `${workers.length} live` : "Empty"}</StatusPill></div><p className="mt-4 text-sm text-stone">Fresh heartbeats only. Workers need a connected payout wallet to receive tasks.</p>
-          {workers.length === 0 ? <div className="mt-8 rounded-xl border border-dashed border-ivory/10 p-6 text-sm leading-relaxed text-stone">No machine is available yet. Start a GPU from Earn to join the matching pool.</div> : <ul className="mt-6 space-y-2">{workers.map((worker) => <li key={worker.id} className="rounded-xl border border-ivory/[.07] bg-black/15 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm text-ivory">{worker.name || worker.adapter}{worker.id === tabId ? " · this device" : ""}</p><p className="mt-1 text-xs text-stone">{worker.kind === "native" ? "Native GPU worker" : "Browser GPU"}{worker.cores != null ? ` · ${worker.cores} cores` : ""}</p></div><StatusPill live={worker.status === "idle"}>{worker.status === "busy" ? "Working" : "Ready"}</StatusPill></div></li>)}</ul>}
+          {workers.length === 0 ? <div className="mt-8 rounded-xl border border-dashed border-ivory/10 p-6 text-sm leading-relaxed text-stone">No machine is available yet. Start a GPU from Earn to join the matching pool.</div> : <ul className="mt-6 space-y-2">{workers.map((worker) => <li key={worker.id} className="rounded-xl border border-ivory/[.07] bg-black/15 p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-sm text-ivory">{worker.name || worker.adapter}{worker.id === tabId ? " · this device" : ""}</p><p className="mt-1 text-xs text-stone">{worker.kind === "native" ? "Native GPU worker" : "Browser GPU"}{worker.cores != null ? ` · ${worker.cores} cores` : ""} · min {(worker.minimumRewardSol ?? .01).toFixed(2)} SOL/task</p></div><StatusPill live={worker.status === "idle"}>{worker.status === "busy" ? "Working" : "Ready"}</StatusPill></div></li>)}</ul>}
         </Panel>
       </div>
 
       <div className="grid items-start gap-4 xl:grid-cols-2"><CodeCreator/><ImageComingSoon/></div>
 
       <Panel><div className="flex items-center justify-between"><div><p className="eyebrow">Activity</p><h2 className="mt-2 text-2xl font-medium tracking-[-.03em] text-ivory">Live task board</h2></div><StatusPill live={jobs.some((job) => job.status === "open" || job.status === "running")}>{jobs.length} total</StatusPill></div>
-        {jobs.length === 0 ? <p className="mt-6 text-sm text-stone">Funded tasks will appear here as they move from escrow to worker settlement.</p> : <ul className="mt-6 divide-y divide-ivory/10 border-y border-ivory/10">{jobs.map((job) => <li key={job.id} className="py-5"><div className="flex flex-wrap items-start justify-between gap-3"><p className="max-w-2xl text-sm text-ivory">{job.prompt}</p><StatusPill live={job.status === "running"}>{statusLabel(job.status)}</StatusPill></div><p className="mt-2 text-xs text-stone">{job.modelSource ? `${job.modelSource} · ` : ""}{job.budget} SOL · {job.workerIds?.length || (job.workerId ? 1 : 0)}/{job.parallelism || 1} workers · {job.status === "running" ? formatEta(job) : job.status === "open" ? `est. ${formatDuration(job.estimatedDurationMs)}` : job.status === "killed" ? "stopped by admin" : "complete"}</p><div className="mt-3 h-1 overflow-hidden bg-ivory/10"><div className={`h-full transition-all duration-700 ${job.status === "killed" ? "bg-red-400" : "bg-gold"}`} style={{ width: `${liveProgress(job)}%` }}/></div><p className="mt-2 text-[11px] text-stone">{job.status === "done" ? "Settled · reward is claimable" : job.status === "killed" ? "Stopped · no worker reward issued" : job.status === "running" ? `Processing · ${formatEta(job)}` : "Queued for a compatible worker"}</p></li>)}</ul>}
+        {jobs.length === 0 ? <p className="mt-6 text-sm text-stone">Funded tasks will appear here as they move from escrow to worker settlement.</p> : <ul className="mt-6 divide-y divide-ivory/10 border-y border-ivory/10">{jobs.map((job) => <li key={job.id} className="py-5"><div className="flex flex-wrap items-start justify-between gap-3"><p className="max-w-2xl text-sm text-ivory">{job.prompt}</p><StatusPill live={job.status === "running"}>{statusLabel(job.status)}</StatusPill></div><p className="mt-2 text-xs text-stone">{job.modelSource ? `${job.modelSource} · ` : ""}{job.budget} SOL · {job.workerIds?.length || (job.workerId ? 1 : 0)}/{job.parallelism || 1} workers · {job.status === "running" ? formatEta(job) : job.status === "open" ? `est. ${formatDuration(job.estimatedDurationMs)}` : job.status === "killed" ? "stopped by admin" : "complete"}</p><div className="mt-3 h-1 overflow-hidden bg-ivory/10"><div className={`h-full transition-all duration-700 ${job.status === "killed" ? "bg-red-400" : "bg-gold"}`} style={{ width: `${liveProgress(job)}%` }}/></div><div className="mt-2 flex items-center justify-between gap-3"><p className="text-[11px] text-stone">{job.status === "done" ? "Settled · reward is claimable" : job.status === "killed" ? "Stopped · no worker reward issued" : job.status === "running" ? `Processing · ${formatEta(job)}` : "Queued for a compatible worker"}</p>{job.status === "done" && getJobAccessToken(job.id) ? <button onClick={() => viewResult(job)} disabled={loadingResult === job.id} className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[.14em] text-gold hover:text-ivory disabled:opacity-50">{loadingResult === job.id ? <LoaderCircle size={12} className="animate-spin"/> : <Eye size={12}/>}View result</button> : null}</div></li>)}</ul>}
+        {resultMessage ? <p className="mt-4 text-sm text-red-300">{resultMessage}</p> : null}
+        {result ? <div className="mt-6 border-t border-ivory/10 pt-6"><div className="flex items-center justify-between gap-4"><div><p className="eyebrow">Completed result</p><p className="mt-2 text-sm text-ivory">{result.job.prompt}</p></div><button onClick={() => setResult(null)} className="text-[10px] uppercase tracking-[.14em] text-stone hover:text-ivory">Close</button></div>{result.value.kind === "image" ? <Image src={result.value.content} alt={result.job.prompt} width={1024} height={1024} unoptimized className="mt-5 max-h-[560px] w-full rounded-sm border border-ivory/10 bg-black object-contain"/> : <pre className="mt-5 max-h-[560px] overflow-auto border border-ivory/10 bg-black/35 p-5 text-xs leading-relaxed text-ivory/85">{result.value.content}</pre>}</div> : null}
       </Panel>
     </Section>
   </div>;

@@ -24,6 +24,7 @@ const ID = process.env.COMPUTEFI_WORKER_ID || `native-${randomUUID()}`;
 const AUTH_TOKEN = process.env.COMPUTEFI_WORKER_TOKEN || randomUUID();
 const EXECUTOR = process.env.COMPUTEFI_EXECUTOR || null;
 const CAPACITY_TFLOPS = Math.max(0, Number(process.env.COMPUTEFI_TFLOPS || os.cpus().length * 0.25));
+const MIN_REWARD_SOL = Math.max(0.01, Number(process.env.COMPUTEFI_MIN_REWARD_SOL || 0.01));
 
 function gpuName() {
   try {
@@ -48,6 +49,7 @@ console.log(`  adapter ${adapter}`);
 console.log(`  mesh    ${BASE}`);
 console.log(`  runner  ${EXECUTOR || "not configured"}`);
 console.log(`  capacity ${CAPACITY_TFLOPS.toFixed(2)} reported TFLOPS`);
+console.log(`  minimum ${MIN_REWARD_SOL.toFixed(4)} SOL per task`);
 console.log(`Keep this process running. Ctrl+C to leave.`);
 
 async function beat() {
@@ -60,6 +62,7 @@ async function beat() {
       adapter,
       cores: os.cpus().length,
       capacityTflops: CAPACITY_TFLOPS,
+      minimumRewardSol: MIN_REWARD_SOL,
       wallet: WALLET,
       authToken: AUTH_TOKEN,
     }),
@@ -109,7 +112,7 @@ async function runJob(initialJob) {
   const response = await fetch(`${BASE}/api/jobs/complete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jobId: job.id, workerId: ID, authToken: AUTH_TOKEN, proof: proof || "completed by local executor" }),
+    body: JSON.stringify({ jobId: job.id, workerId: ID, authToken: AUTH_TOKEN, proof: proof || "completed by local executor", result: { kind: "text", content: proof || "completed by local executor" } }),
   });
   if (!response.ok) throw new Error(`completion ${response.status}`);
   console.log("  Complete. Settlement is available to claim.");

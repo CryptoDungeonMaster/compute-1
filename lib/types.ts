@@ -8,6 +8,7 @@ export type WorkerDoc = {
   adapter: string;
   cores: number | null;
   capacityTflops: number;
+  minimumRewardSol: number;
   wallet: string | null;
   name: string;
   authToken?: string;
@@ -34,6 +35,7 @@ export type JobDoc = {
   completedWorkerIds: string[];
   workerKind: WorkerKind | null;
   proof: string | null;
+  result: { kind: "text" | "image"; content: string } | null;
   progress: number;
   parallelism: number;
   estimatedDurationMs: number;
