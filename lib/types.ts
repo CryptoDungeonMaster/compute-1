@@ -1,6 +1,6 @@
 export type WorkerKind = "webgpu" | "native";
 export type WorkerStatus = "idle" | "busy";
-export type JobStatus = "open" | "running" | "done";
+export type JobStatus = "open" | "running" | "done" | "killed";
 
 export type WorkerDoc = {
   id: string;
@@ -25,6 +25,7 @@ export type JobDoc = {
   currency: "SOL";
   lamports: number;
   paySignature: string;
+  accessToken: string;
   wallet: string | null;
   status: JobStatus;
   workerId: string | null;

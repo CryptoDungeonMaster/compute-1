@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export async function GET() {
   const jobs = await listJobs();
   const visible = jobs.map((job) =>
-    Object.fromEntries(Object.entries(job).filter(([key]) => !["wallet", "paySignature", "fileData", "proof"].includes(key))),
+    Object.fromEntries(Object.entries(job).filter(([key]) => !["wallet", "paySignature", "accessToken", "fileData", "proof"].includes(key))),
   );
   return NextResponse.json({ jobs: visible, mongo: usingMongo() });
 }
@@ -31,16 +31,20 @@ export async function POST(req: Request) {
   if (fileData && fileData.length > 1_400_000) {
     return NextResponse.json({ error: "Uploads must be 1 MB or smaller." }, { status: 400 });
   }
-  const job = await createJob({
-    prompt,
-    modelSource: String(body.modelSource || "").trim(),
-    fileName: String(body.fileName || "").trim(),
-    fileData,
-    budget,
-    currency: "SOL",
-    lamports,
-    paySignature,
-    wallet: body.wallet ? String(body.wallet) : null,
-  });
-  return NextResponse.json({ job });
+  try {
+    const job = await createJob({
+      prompt,
+      modelSource: String(body.modelSource || "").trim(),
+      fileName: String(body.fileName || "").trim(),
+      fileData,
+      budget,
+      currency: "SOL",
+      lamports,
+      paySignature,
+      wallet: body.wallet ? String(body.wallet) : null,
+    });
+    return NextResponse.json({ job });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Task could not be posted." }, { status: 409 });
+  }
 }

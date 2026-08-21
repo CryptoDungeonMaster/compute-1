@@ -83,7 +83,7 @@ export function DashboardView() {
           <Stat label="Claimable" value={`${((earnings?.availableLamports || 0) / 1e9).toFixed(4)} SOL`} hint="Ready to claim" />
           <Stat
             label="Active jobs"
-            value={String(jobs.filter((j) => j.status !== "done").length)}
+            value={String(jobs.filter((j) => j.status === "open" || j.status === "running").length)}
             hint={jobs.length ? `${jobs.length} on the board` : "None posted"}
           />
         </div>

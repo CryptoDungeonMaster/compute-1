@@ -38,7 +38,7 @@ export function MeshProvider({ children }: { children: React.ReactNode }) {
   const submitJob = useCallback(async (input: JobInput) => {
     if (!publicKey) return { error: "Connect your wallet first." };
     const escrowResponse = await fetch("/api/escrow"); const escrow = await escrowResponse.json(); if (!escrowResponse.ok || !escrow.address) return { error: escrow.error || "Escrow is not ready." };
-    const sol = Number(input.budget); if (!Number.isFinite(sol) || sol <= 0) return { error: "Enter a SOL budget greater than zero." };
+    const sol = Number(input.budget); if (!Number.isFinite(sol) || sol < 0.01) return { error: "Enter a SOL budget of at least 0.01." };
     try {
       const transaction = new Transaction().add(SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: new PublicKey(escrow.address), lamports: Math.round(sol * 1_000_000_000) }));
       const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.mainnet-beta.solana.com", "confirmed"); const signature = await sendTransaction(transaction, connection); await connection.confirmTransaction(signature, "confirmed");

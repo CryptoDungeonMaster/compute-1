@@ -39,6 +39,11 @@ async function mongoDb(): Promise<Db | null> {
     globalStore._tapMongo = client.db();
     await globalStore._tapMongo.collection("workers").createIndex({ id: 1 }, { unique: true });
     await globalStore._tapMongo.collection("jobs").createIndex({ createdAt: 1 });
+    await globalStore._tapMongo.collection("jobs").createIndex({ paySignature: 1 }, { unique: true });
+    await globalStore._tapMongo.collection("ledger").createIndex(
+      { jobId: 1, kind: 1 },
+      { unique: true, partialFilterExpression: { kind: "credit" } },
+    );
     return globalStore._tapMongo;
   } catch (err) {
     console.error("MongoDB connect failed, using file store", err);
@@ -95,13 +100,14 @@ async function reclaimStale(jobs: JobDoc[], workers: WorkerDoc[], now = Date.now
 }
 
 function assign(jobs: JobDoc[], workers: WorkerDoc[], now = Date.now()) {
-  const idle = live(workers, now).filter((w) => w.status === "idle");
+  const idle = shuffle(live(workers, now).filter((w) => w.status === "idle" && Boolean(w.wallet)));
   const nextJobs = jobs.map((j) => ({ ...j }));
   const nextWorkers = workers.map((w) => ({ ...w }));
 
   for (const job of nextJobs) {
     if (job.status !== "open") continue;
-    const worker = idle.shift();
+    const eligibleIndex = idle.findIndex((worker) => job.modelSource.startsWith("managed:") || worker.kind === "native");
+    const worker = eligibleIndex >= 0 ? idle.splice(eligibleIndex, 1)[0] : undefined;
     if (!worker) break;
     job.status = "running";
     job.workerId = worker.id;
@@ -116,6 +122,15 @@ function assign(jobs: JobDoc[], workers: WorkerDoc[], now = Date.now()) {
   }
 
   return { jobs: nextJobs, workers: live(nextWorkers, now) };
+}
+
+function shuffle<T>(items: T[]) {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 export async function listWorkers(): Promise<WorkerDoc[]> {
@@ -247,11 +262,12 @@ export async function removeWorker(id: string) {
   });
 }
 
-export async function createJob(input: Omit<JobDoc, "id" | "status" | "workerId" | "workerKind" | "proof" | "progress" | "parallelism" | "createdAt" | "updatedAt">) {
+export async function createJob(input: Omit<JobDoc, "id" | "accessToken" | "status" | "workerId" | "workerKind" | "proof" | "progress" | "parallelism" | "createdAt" | "updatedAt">) {
   const now = Date.now();
   const job: JobDoc = {
     ...input,
     id: crypto.randomUUID(),
+    accessToken: crypto.randomUUID(),
     status: "open",
     workerId: null,
     workerKind: null,
@@ -263,12 +279,14 @@ export async function createJob(input: Omit<JobDoc, "id" | "status" | "workerId"
   };
   const db = await mongoDb();
   if (db) {
+    if (await db.collection("jobs").findOne({ paySignature: input.paySignature })) throw new Error("This escrow payment has already funded a task.");
     await db.collection("jobs").insertOne(job);
     await assignMongo(db, now);
     return (await db.collection("jobs").findOne({ id: job.id })) as unknown as JobDoc;
   }
   return withFileLock(async () => {
     const data = await readFileStore();
+    if (data.jobs.some((existing) => existing.paySignature === input.paySignature)) throw new Error("This escrow payment has already funded a task.");
     const jobs = [job, ...data.jobs];
     const assigned = assign(jobs, data.workers, now);
     await writeFileStore({ ...assigned, ledger: data.ledger });
@@ -289,10 +307,11 @@ async function assignMongo(db: Db, now: number) {
       );
     }
   }
-  const idle = live(workers, now).filter((w) => w.status === "idle" || !w.jobId);
+  const idle = shuffle(live(workers, now).filter((w) => (w.status === "idle" || !w.jobId) && Boolean(w.wallet)));
   const open = reclaimed.filter((j) => j.status === "open").sort((a, b) => a.createdAt - b.createdAt);
   for (const job of open) {
-    const worker = idle.shift();
+    const eligibleIndex = idle.findIndex((worker) => job.modelSource.startsWith("managed:") || worker.kind === "native");
+    const worker = eligibleIndex >= 0 ? idle.splice(eligibleIndex, 1)[0] : undefined;
     if (!worker) break;
     await db.collection("jobs").updateOne(
       { id: job.id },
@@ -387,25 +406,23 @@ export async function completeJob(input: { jobId: string; workerId: string; auth
     if (job.status !== "running" || job.workerId !== input.workerId || worker?.authToken !== input.authToken) {
       throw new Error("This worker is not assigned to that job");
     }
-    await db.collection("jobs").updateOne(
-      { id: job.id },
+    const claimed = await db.collection("jobs").findOneAndUpdate(
+      { id: job.id, status: "running", workerId: input.workerId },
       { $set: { status: "done", proof: input.proof, progress: 100, updatedAt: now } },
+      { returnDocument: "after" },
     );
+    if (!claimed) throw new Error("This task has already been completed or stopped");
     await db.collection("workers").updateOne(
       { id: input.workerId },
       { $set: { status: "idle", jobId: null } },
     );
     const payWallet = worker?.wallet;
     if (payWallet && job.lamports > 0) {
-      await db.collection("ledger").insertOne({
-        id: crypto.randomUUID(),
-        wallet: payWallet,
-        lamports: workerShare(job.lamports),
-        kind: "credit",
-        jobId: job.id,
-        sig: job.paySignature,
-        createdAt: now,
-      });
+      await db.collection("ledger").updateOne(
+        { jobId: job.id, kind: "credit" },
+        { $setOnInsert: { id: crypto.randomUUID(), wallet: payWallet, lamports: workerShare(job.lamports), kind: "credit", jobId: job.id, sig: job.paySignature, createdAt: now } },
+        { upsert: true },
+      );
     }
     await assignMongo(db, now);
     return (await db.collection("jobs").findOne({ id: job.id })) as unknown as JobDoc;
@@ -417,6 +434,79 @@ export async function completeJob(input: { jobId: string; workerId: string; auth
     if (!job) throw new Error("Job not found");
     const worker = data.workers.find((w) => w.id === input.workerId);
     finish(job, worker, data.ledger);
+    const assigned = assign(data.jobs, data.workers, now);
+    await writeFileStore({ ...assigned, ledger: data.ledger });
+    return job;
+  });
+}
+
+/** Completes hosted code/image work and credits the randomly assigned online worker. */
+export async function completeManagedJob(jobId: string, proof: string) {
+  const now = Date.now();
+  const db = await mongoDb();
+  if (db) {
+    const job = (await db.collection("jobs").findOne({ id: jobId })) as unknown as JobDoc | null;
+    if (!job) throw new Error("Task not found");
+    if (!job.modelSource.startsWith("managed:")) throw new Error("This is not a managed task");
+    if (job.status === "done") return job;
+    if (job.status !== "running" || !job.workerId) throw new Error("Task is waiting for an available worker");
+    const worker = (await db.collection("workers").findOne({ id: job.workerId })) as unknown as WorkerDoc | null;
+    if (!worker?.wallet) throw new Error("Assigned worker has no payout wallet");
+    const claimed = await db.collection("jobs").findOneAndUpdate(
+      { id: job.id, status: "running" },
+      { $set: { status: "done", proof, progress: 100, updatedAt: now } },
+      { returnDocument: "after" },
+    );
+    if (!claimed) return (await db.collection("jobs").findOne({ id: job.id })) as unknown as JobDoc;
+    await db.collection("workers").updateOne({ id: worker.id, jobId: job.id }, { $set: { status: "idle", jobId: null } });
+    await db.collection("ledger").updateOne(
+      { jobId: job.id, kind: "credit" },
+      { $setOnInsert: { id: crypto.randomUUID(), wallet: worker.wallet, lamports: workerShare(job.lamports), kind: "credit", jobId: job.id, sig: job.paySignature, createdAt: now } },
+      { upsert: true },
+    );
+    await assignMongo(db, now);
+    return claimed as unknown as JobDoc;
+  }
+  return withFileLock(async () => {
+    const data = await readFileStore();
+    const job = data.jobs.find((item) => item.id === jobId);
+    if (!job) throw new Error("Task not found");
+    if (!job.modelSource.startsWith("managed:")) throw new Error("This is not a managed task");
+    if (job.status === "done") return job;
+    if (job.status !== "running" || !job.workerId) throw new Error("Task is waiting for an available worker");
+    const worker = data.workers.find((item) => item.id === job.workerId);
+    if (!worker?.wallet) throw new Error("Assigned worker has no payout wallet");
+    job.status = "done"; job.proof = proof; job.progress = 100; job.updatedAt = now;
+    worker.status = "idle"; worker.jobId = null;
+    if (!data.ledger.some((entry) => entry.kind === "credit" && entry.jobId === job.id)) {
+      data.ledger.push({ id: crypto.randomUUID(), wallet: worker.wallet, lamports: workerShare(job.lamports), kind: "credit", jobId: job.id, sig: job.paySignature, createdAt: now });
+    }
+    const assigned = assign(data.jobs, data.workers, now);
+    await writeFileStore({ ...assigned, ledger: data.ledger });
+    return job;
+  });
+}
+
+export async function killJob(jobId: string) {
+  const now = Date.now();
+  const db = await mongoDb();
+  if (db) {
+    const job = (await db.collection("jobs").findOne({ id: jobId })) as unknown as JobDoc | null;
+    if (!job) throw new Error("Task not found");
+    if (job.status === "done" || job.status === "killed") throw new Error("Only waiting or running tasks can be killed");
+    await db.collection("jobs").updateOne({ id: jobId, status: { $in: ["open", "running"] } }, { $set: { status: "killed", proof: "Killed by administrator", progress: 0, updatedAt: now } });
+    if (job.workerId) await db.collection("workers").updateOne({ id: job.workerId, jobId }, { $set: { status: "idle", jobId: null } });
+    await assignMongo(db, now);
+    return (await db.collection("jobs").findOne({ id: jobId })) as unknown as JobDoc;
+  }
+  return withFileLock(async () => {
+    const data = await readFileStore();
+    const job = data.jobs.find((item) => item.id === jobId);
+    if (!job) throw new Error("Task not found");
+    if (job.status === "done" || job.status === "killed") throw new Error("Only waiting or running tasks can be killed");
+    const worker = job.workerId ? data.workers.find((item) => item.id === job.workerId) : null;
+    job.status = "killed"; job.proof = "Killed by administrator"; job.progress = 0; job.updatedAt = now;
+    if (worker) { worker.status = "idle"; worker.jobId = null; }
     const assigned = assign(data.jobs, data.workers, now);
     await writeFileStore({ ...assigned, ledger: data.ledger });
     return job;
