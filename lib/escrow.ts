@@ -14,6 +14,7 @@ import bs58 from "bs58";
 
 const FILE = path.join(process.cwd(), ".data", "escrow.json");
 const FEE_BPS = 250;
+export const MIN_JOB_LAMPORTS = Math.round(0.01 * LAMPORTS_PER_SOL);
 
 const globalEscrow = globalThis as typeof globalThis & { _tapEscrow?: Keypair };
 

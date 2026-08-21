@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createJob, listJobs, usingMongo } from "@/lib/store";
-import { solToLamports, verifyPayToEscrow } from "@/lib/escrow";
+import { MIN_JOB_LAMPORTS, solToLamports, verifyPayToEscrow } from "@/lib/escrow";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,8 +22,8 @@ export async function POST(req: Request) {
   const budget = String(body.budget || "").trim();
   const lamports = solToLamports(budget);
   const paySignature = String(body.paySignature || "").trim();
-  if (!lamports || !paySignature) {
-    return NextResponse.json({ error: "Pay the SOL budget before posting this job." }, { status: 400 });
+  if (lamports < MIN_JOB_LAMPORTS || !paySignature) {
+    return NextResponse.json({ error: "Fund at least 0.01 SOL before posting this job." }, { status: 400 });
   }
   const payment = await verifyPayToEscrow(paySignature, lamports);
   if (!payment.ok) return NextResponse.json({ error: payment.reason }, { status: 400 });
