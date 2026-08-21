@@ -7,7 +7,9 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const jobs = await listJobs();
-  const visible = jobs.map(({ wallet, paySignature, fileData, proof, ...job }) => job);
+  const visible = jobs.map((job) =>
+    Object.fromEntries(Object.entries(job).filter(([key]) => !["wallet", "paySignature", "fileData", "proof"].includes(key))),
+  );
   return NextResponse.json({ jobs: visible, mongo: usingMongo() });
 }
 
