@@ -19,14 +19,14 @@ export function Hero() {
   return <section className="relative overflow-hidden border-b border-ivory/[.08] bg-[#040504]">
     <div className="square-grid absolute inset-0 opacity-80"/>
     <div className="relative mx-auto flex max-w-page flex-col px-6 pb-12 pt-28">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .65 }}>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .65 }} className="mx-auto flex max-w-3xl flex-col items-center text-center">
         <p className="eyebrow flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-gold"/>Compute marketplace · Solana</p>
-        <h1 className="mt-7 max-w-3xl text-6xl font-medium leading-[.92] tracking-[-.075em] text-ivory sm:text-7xl md:text-[88px]">Idle compute,<br/><span className="text-gold">settled.</span></h1>
+        <h1 className="mt-7 text-6xl font-medium leading-[.92] tracking-[-.075em] text-ivory sm:text-7xl md:text-[88px]">Idle compute,<br/><span className="text-gold">settled.</span></h1>
         <p className="mt-7 max-w-xl text-base leading-relaxed text-stone md:text-lg">A direct market for GPU work. Rent capacity, verify the result, then release SOL to the machines that completed it.</p>
-        <div className="mt-9 flex flex-wrap gap-3"><Button href="/earn">Start earning <ArrowUpRight size={14}/></Button><Button href="/rent" variant="secondary">Rent compute</Button></div>
+        <div className="mt-9 flex flex-wrap justify-center gap-3"><Button href="/earn">Start earning <ArrowUpRight size={14}/></Button><Button href="/rent" variant="secondary">Rent compute</Button></div>
       </motion.div>
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .25, duration: .8 }} className="mt-12 w-full"><NetworkMesh/></motion.div>
-      <div className="mt-12 grid grid-cols-2 border-y border-ivory/[.1] sm:grid-cols-4">{metrics.map(([value, label], index) => <div key={label} className={`py-4 ${index ? "border-l border-ivory/[.1] pl-4 sm:pl-6" : "pr-4"}`}><p className="font-mono text-sm text-ivory">{value}</p><p className="mt-1 text-[9px] uppercase tracking-[.16em] text-stone">{label}</p></div>)}</div>
+      <div className="mx-auto mt-12 grid w-full max-w-4xl grid-cols-2 border-y border-ivory/[.1] sm:grid-cols-4">{metrics.map(([value, label], index) => <div key={label} className={`py-4 text-center ${index ? "border-l border-ivory/[.1]" : ""}`}><p className="font-mono text-sm text-ivory">{value}</p><p className="mt-1 text-[9px] uppercase tracking-[.16em] text-stone">{label}</p></div>)}</div>
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: .25, duration: .8 }} className="mx-auto mt-12 w-full"><NetworkMesh/></motion.div>
     </div>
     <div className="compute-stream absolute bottom-0 h-px w-full bg-ivory/[.08]"/>
   </section>;
