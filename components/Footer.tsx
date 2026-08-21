@@ -4,7 +4,6 @@ import { Logo } from "@/components/Logo";
 const LINKS = [
   { href: "/earn", label: "Earn" },
   { href: "/rent", label: "Rent" },
-  { href: "/network", label: "Network" },
   { href: "/docs", label: "Docs" },
   { href: "/dashboard", label: "Studio" },
 ];
@@ -34,7 +33,7 @@ export function Footer() {
       </div>
       <div className="mx-auto flex max-w-page flex-col gap-2 border-t border-ivory/[.07] px-6 py-6 text-[10px] uppercase leading-relaxed tracking-[.13em] text-stone/70 sm:flex-row sm:justify-between">
         <span>© {new Date().getFullYear()} ComputeFi</span>
-        <span><i className="mr-2 not-italic text-gold">●</i>Network operational</span>
+        <span><i className="mr-2 not-italic text-gold">●</i>System operational</span>
       </div>
     </footer>
   );
