@@ -8,13 +8,13 @@ export async function GET(req: Request) {
   const script = [
     "@echo off",
     "setlocal",
-    "title Tap Power Worker",
+    "title ComputeFi Worker",
     "where node >nul 2>nul || (echo Node.js 18 or newer is required. Install it from https://nodejs.org then run this file again.& pause & exit /b 1)",
     `set \"TAP_POWER_URL=${origin}\"`,
     "set /p \"TAP_POWER_WALLET=Solana wallet to receive earnings: \"",
     "if \"%TAP_POWER_WALLET%\"==\"\" (echo A wallet address is required.& pause & exit /b 1)",
     "set /p \"TAP_POWER_OLLAMA_MODEL=Ollama model to run (example: llama3.2:3b; leave blank to only join): \"",
-    "set \"TAP_WORKER_DIR=%LOCALAPPDATA%\\TapPower\"",
+    "set \"TAP_WORKER_DIR=%LOCALAPPDATA%\\ComputeFi\"",
     "if not exist \"%TAP_WORKER_DIR%\" mkdir \"%TAP_WORKER_DIR%\"",
     `powershell -NoProfile -ExecutionPolicy Bypass -Command \"Invoke-WebRequest -UseBasicParsing '${origin}/tap-power-worker.mjs' -OutFile '%TAP_WORKER_DIR%\\tap-power-worker.mjs'\"`,
     `if not \"%TAP_POWER_OLLAMA_MODEL%\"==\"\" powershell -NoProfile -ExecutionPolicy Bypass -Command \"Invoke-WebRequest -UseBasicParsing '${origin}/tap-power-ollama-executor.mjs' -OutFile '%TAP_WORKER_DIR%\\tap-power-ollama-executor.mjs'\"`,
@@ -23,10 +23,10 @@ export async function GET(req: Request) {
     "if not \"%TAP_POWER_OLLAMA_MODEL%\"==\"\" set \"TAP_POWER_ALLOWED_MODELS=%TAP_POWER_OLLAMA_MODEL%\"",
     "if not \"%TAP_POWER_OLLAMA_MODEL%\"==\"\" set \"TAP_POWER_EXECUTOR=%TAP_WORKER_DIR%\\tap-power-ollama-executor.mjs\"",
     "echo.",
-    "echo Tap Power worker is starting. Keep this window open while sharing.",
+    "echo ComputeFi worker is starting. Keep this window open while sharing.",
     "node tap-power-worker.mjs",
     "pause",
     "",
   ].join("\r\n");
-  return new NextResponse(script, { headers: { "Content-Type": "application/octet-stream; charset=utf-8", "Content-Disposition": "attachment; filename=Tap-Power-Worker.cmd", "Cache-Control": "no-store" } });
+  return new NextResponse(script, { headers: { "Content-Type": "application/octet-stream; charset=utf-8", "Content-Disposition": "attachment; filename=ComputeFi-Worker.cmd", "Cache-Control": "no-store" } });
 }

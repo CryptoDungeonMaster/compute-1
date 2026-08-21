@@ -4,9 +4,11 @@
 
 :root {
   color-scheme: dark;
-  --bg: #0a0a0b;
-  --ivory: #ede6d6;
-  --gold: #c4a574;
+  --bg: #050505;
+  --ivory: #f2f4f3;
+  --gold: #00e878;
+  --surface: #080a09;
+  --elevated: #0d0f0e;
 }
 
 html,
@@ -29,8 +31,8 @@ p {
 }
 
 ::selection {
-  background: rgba(196, 165, 116, 0.28);
-  color: #fff8ee;
+  background: rgba(0, 232, 120, 0.28);
+  color: #fff;
 }
 
 ::-webkit-scrollbar {
@@ -39,26 +41,27 @@ p {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0a0a0b;
+  background: #050505;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a2926;
+  background: #303030;
   border-radius: 999px;
 }
 
 * {
-  outline-color: rgba(196, 165, 116, 0.55);
+  outline-color: rgba(163, 255, 111, 0.55);
 }
 
 @layer components {
   .hairline {
-    border: 1px solid rgba(237, 230, 214, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
   }
 
   .panel {
-    background: rgba(20, 20, 22, 0.55);
-    border: 1px solid rgba(237, 230, 214, 0.1);
+    background: linear-gradient(135deg, rgba(16, 19, 17, .88), rgba(8, 10, 9, .92));
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
   }
 
   .eyebrow {
@@ -70,10 +73,35 @@ p {
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(196, 165, 116, 0.45),
+      rgba(163, 255, 111, 0.45),
       transparent
     );
   }
+}
+
+@keyframes compute-flow {
+  from { transform: translateX(-120%); opacity: 0; }
+  14% { opacity: 1; }
+  86% { opacity: 1; }
+  to { transform: translateX(820%); opacity: 0; }
+}
+
+@keyframes core-pulse {
+  0%, 100% { opacity: .28; transform: scale(.96); }
+  50% { opacity: .8; transform: scale(1.035); }
+}
+
+@keyframes orbit {
+  to { transform: rotate(360deg); }
+}
+
+.compute-stream { position: relative; overflow: hidden; }
+.compute-stream::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 14%; background: linear-gradient(90deg, transparent, #00e878, transparent); animation: compute-flow 4.5s linear infinite; }
+.core-ring { animation: orbit 18s linear infinite; }
+.core-pulse { animation: core-pulse 4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
 
 .wallet-adapter-modal-wrapper {
@@ -83,19 +111,19 @@ p {
 
 .wallet-adapter-modal {
   background: #121214 !important;
-  border: 1px solid rgba(237, 230, 214, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   border-radius: 4px !important;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55) !important;
 }
 
 .wallet-adapter-modal-title {
-  color: #ede6d6 !important;
+  color: #f5f5f5 !important;
   font-weight: 500 !important;
 }
 
 .wallet-adapter-modal-list li {
   background: rgba(255, 255, 255, 0.02) !important;
-  border: 1px solid rgba(237, 230, 214, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 4px !important;
 }
 
@@ -104,7 +132,7 @@ p {
 }
 
 .wallet-adapter-button:not(.wallet-adapter-button-trigger):hover {
-  background: rgba(196, 165, 116, 0.1) !important;
+  background: rgba(163, 255, 111, 0.1) !important;
 }
 
 .wallet-adapter-modal-button-close {

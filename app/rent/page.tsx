@@ -2,9 +2,9 @@ import { PageShell } from "@/components/PageShell";
 import { RentView } from "@/components/rent/RentView";
 
 export const metadata = {
-  title: "Rent · Tap Power",
+  title: "Rent · ComputeFi",
   description:
-    "Pay in SOL to run approved AI inference, rendering, and data jobs through the Tap Power worker board.",
+    "Deploy verified AI inference, rendering, and data workloads across the ComputeFi network.",
 };
 
 export default function RentPage() {

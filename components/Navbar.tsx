@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 const LINKS = [
   { href: "/earn", label: "Earn" },
   { href: "/rent", label: "Rent" },
+  { href: "/#market", label: "Market" },
+  { href: "/network", label: "Network" },
   { href: "/docs", label: "Docs" },
   { href: "/dashboard", label: "Studio" },
 ];
@@ -35,11 +37,11 @@ export function Navbar() {
   return (
     <header
       className={cn(
-        "fixed inset-x-0 top-0 z-50 transition-colors duration-300",
-        scrolled || open ? "border-b border-ivory/10 bg-ink/80 backdrop-blur-md" : "bg-transparent",
+        "fixed inset-x-0 top-0 z-50 transition-all duration-300",
+        scrolled || open ? "border-b border-ivory/[.07] bg-[#050605]/80 backdrop-blur-xl" : "bg-transparent",
       )}
     >
-      <div className="mx-auto flex h-[72px] w-full max-w-page items-center justify-between gap-4 px-6">
+      <div className="mx-auto flex h-[64px] w-full max-w-page items-center justify-between gap-4 px-6">
         <Logo />
         <nav className="hidden items-center gap-8 md:flex">
           {LINKS.map((link) => {

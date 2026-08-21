@@ -7,7 +7,7 @@ type ButtonVariant = "primary" | "secondary" | "ghost";
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "bg-ivory text-ink hover:bg-white border-transparent",
+    "border-gold/60 bg-[#101512] text-ivory shadow-[inset_0_0_0_1px_rgba(0,232,120,.08)] hover:border-gold hover:bg-[#141b16]",
   secondary:
     "bg-transparent text-ivory border-ivory/20 hover:border-gold/70 hover:text-gold",
   ghost: "bg-transparent text-ivory/70 border-transparent hover:text-ivory",
@@ -31,7 +31,7 @@ export function Button({
   disabled?: boolean;
 }) {
   const classes = cn(
-    "inline-flex items-center justify-center gap-2 rounded-sm border px-5 py-2.5 text-[13px] tracking-[0.08em] uppercase transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40",
+    "inline-flex items-center justify-center gap-2 rounded-sm border px-5 py-2.5 text-[11px] tracking-[0.14em] uppercase transition-all duration-200 hover:-translate-y-px active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40",
     variants[variant],
     className,
   );
@@ -98,7 +98,7 @@ export function SectionHeading({
   return (
     <div className="max-w-2xl">
       <p className="eyebrow">{eyebrow}</p>
-      <h2 className="mt-4 font-display text-4xl font-light italic leading-[1.15] text-ivory md:text-5xl">
+      <h2 className="mt-4 font-display text-4xl font-medium leading-[1.08] tracking-[-0.045em] text-ivory md:text-5xl">
         {title}
       </h2>
       {copy ? (

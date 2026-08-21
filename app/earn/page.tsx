@@ -2,7 +2,7 @@ import { PageShell } from "@/components/PageShell";
 import { EarnView } from "@/components/earn/EarnView";
 
 export const metadata = {
-  title: "Earn · Tap Power",
+  title: "Earn · ComputeFi",
   description:
     "Connect a Solana wallet, keep a tab open, and earn SOL by completing approved compute jobs.",
 };
