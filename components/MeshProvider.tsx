@@ -29,7 +29,7 @@ export function MeshProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { setId(tabId()); setSharing(localStorage.getItem(SHARE_KEY) === "1"); readDeviceInfo().then(setDevice); refresh(); const timer = window.setInterval(refresh, 2000); return () => window.clearInterval(timer); }, [refresh]);
   useEffect(() => {
     if (!sharing || !id || !device) return; let stop = false;
-    const beat = async () => { await fetch("/api/workers/heartbeat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, authToken: workerToken(), kind: "webgpu", adapter: device.label, cores: device.cores, wallet }) }); if (!stop) await refresh(); };
+    const beat = async () => { await fetch("/api/workers/heartbeat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, authToken: workerToken(), kind: "webgpu", adapter: device.label, cores: device.cores, capacityTflops: device.capacityTflops, wallet }) }); if (!stop) await refresh(); };
     beat(); const timer = window.setInterval(beat, 3000); const leave = () => { stop = true; navigator.sendBeacon?.("/api/workers/leave", new Blob([JSON.stringify({ id })], { type: "application/json" })); };
     window.addEventListener("pagehide", leave); return () => { window.clearInterval(timer); window.removeEventListener("pagehide", leave); };
   }, [sharing, id, device, wallet, refresh]);

@@ -23,6 +23,7 @@ const WALLET = process.env.COMPUTEFI_WALLET || null;
 const ID = process.env.COMPUTEFI_WORKER_ID || `native-${randomUUID()}`;
 const AUTH_TOKEN = process.env.COMPUTEFI_WORKER_TOKEN || randomUUID();
 const EXECUTOR = process.env.COMPUTEFI_EXECUTOR || null;
+const CAPACITY_TFLOPS = Math.max(0, Number(process.env.COMPUTEFI_TFLOPS || os.cpus().length * 0.25));
 
 function gpuName() {
   try {
@@ -46,6 +47,7 @@ console.log(`  id      ${ID}`);
 console.log(`  adapter ${adapter}`);
 console.log(`  mesh    ${BASE}`);
 console.log(`  runner  ${EXECUTOR || "not configured"}`);
+console.log(`  capacity ${CAPACITY_TFLOPS.toFixed(2)} reported TFLOPS`);
 console.log(`Keep this process running. Ctrl+C to leave.`);
 
 async function beat() {
@@ -57,6 +59,7 @@ async function beat() {
       kind: "native",
       adapter,
       cores: os.cpus().length,
+      capacityTflops: CAPACITY_TFLOPS,
       wallet: WALLET,
       authToken: AUTH_TOKEN,
     }),
@@ -83,6 +86,12 @@ async function runJob(job) {
   if (!EXECUTOR) {
     console.log("  Waiting: set COMPUTEFI_EXECUTOR before this worker can run and settle jobs.");
     return;
+  }
+  while (job.readyAt && Date.now() < job.readyAt) {
+    const seconds = Math.max(1, Math.ceil((job.readyAt - Date.now()) / 1000));
+    process.stdout.write(`\rprocessing window ${seconds}s remaining   `);
+    await new Promise((resolve) => setTimeout(resolve, Math.min(3000, job.readyAt - Date.now())));
+    await beat();
   }
   const isNodeScript = EXECUTOR.endsWith(".mjs") || EXECUTOR.endsWith(".js");
   const result = spawnSync(isNodeScript ? process.execPath : EXECUTOR, isNodeScript ? [EXECUTOR] : [], {

@@ -107,6 +107,9 @@ export async function verifyPayToEscrow(signature: string, minLamports: number) 
 export async function payFromEscrow(to: string, lamports: number) {
   const kp = await getEscrowKeypair();
   const conn = connection();
+  const balance = await conn.getBalance(kp.publicKey, "confirmed");
+  const feeReserve = 10_000;
+  if (balance < lamports + feeReserve) throw new Error(`Escrow has ${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL but needs ${((lamports + feeReserve) / LAMPORTS_PER_SOL).toFixed(4)} SOL including network fees.`);
   const dest = new PublicKey(to);
   const tx = new Transaction().add(
     SystemProgram.transfer({
@@ -117,6 +120,11 @@ export async function payFromEscrow(to: string, lamports: number) {
   );
   const sig = await sendAndConfirmTransaction(conn, tx, [kp]);
   return sig;
+}
+
+export async function getEscrowBalance() {
+  const kp = await getEscrowKeypair();
+  return connection().getBalance(kp.publicKey, "confirmed");
 }
 
 export const PROTOCOL_FEE_BPS = FEE_BPS;

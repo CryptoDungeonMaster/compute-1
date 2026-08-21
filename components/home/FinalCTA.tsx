@@ -7,7 +7,7 @@ export function FinalCTA() {
     <section className="mx-auto max-w-page px-6 pb-28">
       <div className="border-y border-ivory/10 py-16 text-center md:py-24">
         <p className="eyebrow">Invitation</p>
-        <h2 className="mt-5 font-display text-4xl font-light italic text-ivory md:text-6xl">
+        <h2 className="mt-5 text-4xl font-medium tracking-[-.05em] text-ivory md:text-6xl">
           Put idle GPUs on a payroll.
         </h2>
         <p className="mx-auto mt-5 max-w-lg text-stone">

@@ -8,6 +8,7 @@ import { Button, Panel, Section, StatusPill } from "@/components/ui";
 import { useMesh } from "@/components/MeshProvider";
 import { CodeCreator } from "@/components/rent/CodeCreator";
 import { ImageComingSoon } from "@/components/rent/ImageComingSoon";
+import type { JobDoc } from "@/lib/types";
 
 export function RentView() {
   const { connected } = useWallet();
@@ -42,11 +43,11 @@ export function RentView() {
     <section className="relative mx-auto max-w-page px-6 pb-14 pt-28 md:pt-36">
       <div className="absolute left-6 top-28 h-24 w-24 rounded-full bg-gold/10 blur-3xl"/>
       <p className="eyebrow">Compute marketplace · live</p>
-      <h1 className="mt-5 max-w-4xl text-5xl font-medium leading-[.98] tracking-[-.065em] text-ivory md:text-7xl">Create at network speed.<br/><span className="bg-gradient-to-r from-gold via-[#7dffbb] to-[#bda8ff] bg-clip-text text-transparent">Reward real compute.</span></h1>
+      <h1 className="mt-5 max-w-4xl text-5xl font-medium leading-[.98] tracking-[-.065em] text-ivory md:text-7xl">Create at network speed.<br/><span className="text-gold">Reward real compute.</span></h1>
       <p className="mt-7 max-w-2xl text-lg leading-relaxed text-stone">Fund a task from 0.01 SOL. It locks in escrow, matches a random online worker, and becomes claimable after completion.</p>
     </section>
     <Section className="space-y-4 pt-4">
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid border-y border-ivory/10 md:grid-cols-3">
         <Flow icon={<Vault size={18}/>} number="01" title="Fund escrow" copy="Choose any reward from 0.01 SOL."/>
         <Flow icon={<Shuffle size={18}/>} number="02" title="Random match" copy="An eligible online worker is selected."/>
         <Flow icon={<Cpu size={18}/>} number="03" title="Run & settle" copy="Completion unlocks a claimable reward."/>
@@ -70,16 +71,20 @@ export function RentView() {
       <div className="grid items-start gap-4 xl:grid-cols-2"><CodeCreator/><ImageComingSoon/></div>
 
       <Panel><div className="flex items-center justify-between"><div><p className="eyebrow">Activity</p><h2 className="mt-2 text-2xl font-medium tracking-[-.03em] text-ivory">Live task board</h2></div><StatusPill live={jobs.some((job) => job.status === "open" || job.status === "running")}>{jobs.length} total</StatusPill></div>
-        {jobs.length === 0 ? <p className="mt-6 text-sm text-stone">Funded tasks will appear here as they move from escrow to worker settlement.</p> : <ul className="mt-6 divide-y divide-ivory/10 border-y border-ivory/10">{jobs.map((job) => <li key={job.id} className="py-5"><div className="flex flex-wrap items-start justify-between gap-3"><p className="max-w-2xl text-sm text-ivory">{job.prompt}</p><StatusPill live={job.status === "running"}>{statusLabel(job.status)}</StatusPill></div><p className="mt-2 text-xs text-stone">{job.modelSource ? `${job.modelSource} · ` : ""}{job.budget} SOL · {job.workerId ? "worker matched" : job.status === "killed" ? "stopped by admin" : "waiting for a worker"}</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ivory/10"><div className={`h-full transition-all duration-700 ${job.status === "killed" ? "bg-red-400" : "bg-gold"}`} style={{ width: `${job.status === "killed" ? 100 : job.progress || 0}%` }}/></div><p className="mt-2 text-[11px] text-stone">{job.status === "done" ? "Settled · reward is claimable" : job.status === "killed" ? "Stopped · no worker reward issued" : job.status === "running" ? "Assigned · processing" : "Queued for a compatible worker"}</p></li>)}</ul>}
+        {jobs.length === 0 ? <p className="mt-6 text-sm text-stone">Funded tasks will appear here as they move from escrow to worker settlement.</p> : <ul className="mt-6 divide-y divide-ivory/10 border-y border-ivory/10">{jobs.map((job) => <li key={job.id} className="py-5"><div className="flex flex-wrap items-start justify-between gap-3"><p className="max-w-2xl text-sm text-ivory">{job.prompt}</p><StatusPill live={job.status === "running"}>{statusLabel(job.status)}</StatusPill></div><p className="mt-2 text-xs text-stone">{job.modelSource ? `${job.modelSource} · ` : ""}{job.budget} SOL · {job.workerIds?.length || (job.workerId ? 1 : 0)}/{job.parallelism || 1} workers · {job.status === "running" ? formatEta(job) : job.status === "open" ? `est. ${formatDuration(job.estimatedDurationMs)}` : job.status === "killed" ? "stopped by admin" : "complete"}</p><div className="mt-3 h-1 overflow-hidden bg-ivory/10"><div className={`h-full transition-all duration-700 ${job.status === "killed" ? "bg-red-400" : "bg-gold"}`} style={{ width: `${liveProgress(job)}%` }}/></div><p className="mt-2 text-[11px] text-stone">{job.status === "done" ? "Settled · reward is claimable" : job.status === "killed" ? "Stopped · no worker reward issued" : job.status === "running" ? `Processing · ${formatEta(job)}` : "Queued for a compatible worker"}</p></li>)}</ul>}
       </Panel>
     </Section>
   </div>;
 }
 
 function Flow({ icon, number, title, copy }: { icon: React.ReactNode; number: string; title: string; copy: string }) {
-  return <div className="panel flex items-center gap-4 rounded-2xl p-5"><div className="rounded-xl border border-gold/20 bg-gold/10 p-3 text-gold">{icon}</div><div><p className="text-[9px] uppercase tracking-[.2em] text-stone">{number}</p><p className="mt-1 text-sm font-medium text-ivory">{title}</p><p className="mt-1 text-xs text-stone">{copy}</p></div></div>;
+  return <div className="flex items-center gap-4 py-5 md:border-l md:border-ivory/10 md:px-6 first:border-l-0"><div className="text-gold">{icon}</div><div><p className="text-[9px] uppercase tracking-[.2em] text-stone">{number}</p><p className="mt-1 text-sm font-medium text-ivory">{title}</p><p className="mt-1 text-xs text-stone">{copy}</p></div></div>;
 }
 
 function statusLabel(status: "open" | "running" | "done" | "killed") {
   return status === "open" ? "Waiting" : status === "running" ? "Working" : status === "killed" ? "Killed" : "Settled";
 }
+
+function formatDuration(ms = 0) { const seconds = Math.max(0, Math.ceil(ms / 1000)); return seconds < 60 ? `${seconds}s` : `${Math.ceil(seconds / 60)} min`; }
+function formatEta(job: JobDoc) { return job.readyAt ? `about ${formatDuration(Math.max(0, job.readyAt - Date.now()))} left` : `est. ${formatDuration(job.estimatedDurationMs)}`; }
+function liveProgress(job: JobDoc) { if (job.status === "done" || job.status === "killed") return 100; if (job.status === "open" || !job.startedAt || !job.readyAt) return 0; const window = Math.max(1, job.readyAt - job.startedAt); return Math.min(94, Math.max(job.progress || 5, Math.round(((Date.now() - job.startedAt) / window) * 94))); }

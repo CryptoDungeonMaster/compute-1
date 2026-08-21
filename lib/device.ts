@@ -2,6 +2,7 @@ export type DeviceInfo = {
   webgpu: boolean;
   label: string;
   cores: number | null;
+  capacityTflops: number;
 };
 
 type GpuAdapterLike = {
@@ -17,13 +18,13 @@ export async function readDeviceInfo(): Promise<DeviceInfo> {
     : undefined;
 
   if (!gpu) {
-    return { webgpu: false, label: "WebGPU not available in this browser", cores };
+    return { webgpu: false, label: "WebGPU not available in this browser", cores, capacityTflops: 0 };
   }
 
   try {
     const adapter = await gpu.requestAdapter();
     if (!adapter) {
-      return { webgpu: false, label: "No GPU adapter found", cores };
+      return { webgpu: false, label: "No GPU adapter found", cores, capacityTflops: 0 };
     }
 
     const parts = [adapter.info?.vendor, adapter.info?.architecture, adapter.info?.device]
@@ -34,8 +35,9 @@ export async function readDeviceInfo(): Promise<DeviceInfo> {
       webgpu: true,
       label: parts.length ? parts.join(" · ") : "WebGPU adapter",
       cores,
+      capacityTflops: Math.max(0.25, (cores || 1) * 0.2),
     };
   } catch {
-    return { webgpu: false, label: "WebGPU request was blocked", cores };
+    return { webgpu: false, label: "WebGPU request was blocked", cores, capacityTflops: 0 };
   }
 }

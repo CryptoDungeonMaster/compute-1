@@ -17,6 +17,7 @@ export async function POST(req: Request) {
       kind: body.kind === "native" ? "native" : "webgpu",
       adapter: String(body.adapter || "Unknown adapter"),
       cores: typeof body.cores === "number" ? body.cores : null,
+      capacityTflops: typeof body.capacityTflops === "number" && Number.isFinite(body.capacityTflops) ? Math.max(0, body.capacityTflops) : 0,
       wallet: body.wallet ? String(body.wallet) : null,
       authToken,
     });

@@ -23,6 +23,10 @@ export async function POST(req: Request) {
     if (job.status === "open") return NextResponse.json({ error: "Waiting for an online GPU worker.", waiting: true }, { status: 409 });
     if (job.status === "killed") return NextResponse.json({ error: "This task was stopped by an administrator." }, { status: 410 });
     if (job.status === "done") return NextResponse.json({ error: "This task has already settled." }, { status: 409 });
+    if (job.readyAt && Date.now() < job.readyAt) {
+      const remainingMs = job.readyAt - Date.now();
+      return NextResponse.json({ error: "Task is processing.", waiting: true, remainingMs }, { status: 409 });
+    }
     if (!allowAiRequest(ip)) return NextResponse.json({ error: "AI request limit reached. Try again in a few minutes." }, { status: 429 });
     if (kind === "code") {
       const result = await generateCode(prompt);

@@ -4,8 +4,8 @@ import { Section, SectionHeading } from "@/components/ui";
 
 const ITEMS = [
   {
-    title: "Nothing to install",
-    copy: "Jobs compile to WebGPU. If the tab can paint a canvas, it can contribute.",
+    title: "Visible capacity",
+    copy: "Live workers report their available adapters and estimated throughput to the network.",
   },
   {
     title: "Two rails",
@@ -13,11 +13,11 @@ const ITEMS = [
   },
   {
     title: "Escrow first",
-    copy: "Budget locks on Solana until hashed results agree. Unused funds return. No prepaid trust.",
+    copy: "The task budget reaches escrow before scheduling. Worker credit is written only after completion.",
   },
   {
-    title: "Adapter based rates",
-    copy: "Capable adapters price higher. Lighter machines take the long tail.",
+    title: "Parallel when useful",
+    copy: "Longer workloads can recruit up to three available workers and divide settlement between participants.",
   },
 ];
 
@@ -29,10 +29,11 @@ export function Benefits() {
         title="Quiet rails for idle silicon."
         copy="Built as a product, not a faucet. Clear pricing, verified output, wallet native settlement."
       />
-      <div className="mt-16 grid gap-px bg-ivory/10 md:grid-cols-2">
-        {ITEMS.map((item) => (
-          <article key={item.title} className="bg-ink p-8 md:p-10">
-            <h3 className="font-display text-2xl font-light italic text-ivory">
+      <div className="mt-16 grid border-y border-ivory/10 md:grid-cols-2">
+        {ITEMS.map((item, index) => (
+          <article key={item.title} className={`py-8 md:p-10 ${index % 2 ? "md:border-l md:border-ivory/10" : ""} ${index > 1 ? "border-t border-ivory/10" : index === 1 ? "border-t border-ivory/10 md:border-t-0" : ""}`}>
+            <p className="font-mono text-[9px] tracking-[.18em] text-gold">0{index + 1}</p>
+            <h3 className="mt-3 text-xl font-medium text-ivory">
               {item.title}
             </h3>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-stone">

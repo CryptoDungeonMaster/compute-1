@@ -3,6 +3,7 @@ import path from "path";
 import { MongoClient, type Db } from "mongodb";
 import type { Earnings, JobDoc, LedgerEntry, WorkerDoc } from "@/lib/types";
 import { workerShare } from "@/lib/escrow";
+import { isAdminWallet } from "@/lib/admin";
 
 const STALE_MS = 20_000;
 const FILE = path.join(process.cwd(), ".data", "mesh.json");
@@ -22,6 +23,7 @@ const globalStore = globalThis as typeof globalThis & {
 };
 
 let fileLock: Promise<void> = Promise.resolve();
+let mongoAssignLock: Promise<void> = Promise.resolve();
 
 function uri() {
   return process.env.MONGODB_URI || process.env.MONGO_URI || "";
@@ -40,9 +42,10 @@ async function mongoDb(): Promise<Db | null> {
     await globalStore._tapMongo.collection("workers").createIndex({ id: 1 }, { unique: true });
     await globalStore._tapMongo.collection("jobs").createIndex({ createdAt: 1 });
     await globalStore._tapMongo.collection("jobs").createIndex({ paySignature: 1 }, { unique: true });
+    await globalStore._tapMongo.collection("ledger").dropIndex("jobId_1_kind_1").catch(() => undefined);
     await globalStore._tapMongo.collection("ledger").createIndex(
-      { jobId: 1, kind: 1 },
-      { unique: true, partialFilterExpression: { kind: "credit" } },
+      { jobId: 1, kind: 1, wallet: 1 },
+      { name: "job_credit_wallet_unique_v2", unique: true, partialFilterExpression: { kind: "credit" } },
     );
     return globalStore._tapMongo;
   } catch (err) {
@@ -83,15 +86,49 @@ function live(workers: WorkerDoc[], now = Date.now()) {
   return workers.filter((w) => now - w.heartbeat < STALE_MS);
 }
 
+function assignedIds(job: JobDoc) {
+  return job.workerIds?.length ? job.workerIds : job.workerId ? [job.workerId] : [];
+}
+
+function completedIds(job: JobDoc) {
+  return job.completedWorkerIds || [];
+}
+
+function recommendedParallelism(prompt: string, fileData: string | null) {
+  const weight = prompt.length + Math.floor((fileData?.length || 0) / 4);
+  return weight >= 2_500 ? 3 : weight >= 800 ? 2 : 1;
+}
+
+function estimatedDuration(prompt: string, admin: boolean) {
+  if (admin) return 0;
+  const lengthWeight = Math.min(1, prompt.trim().length / 4_000);
+  const jitter = Math.floor(Math.random() * 25_000);
+  return Math.min(300_000, Math.round(30_000 + lengthWeight * 245_000 + jitter));
+}
+
+function payoutAllocations(workers: WorkerDoc[], lamports: number) {
+  const payable = workers.filter((worker): worker is WorkerDoc & { wallet: string } => Boolean(worker.wallet));
+  if (!payable.length) return [];
+  const total = workerShare(lamports);
+  const perWorker = Math.floor(total / payable.length);
+  const byWallet = new Map<string, number>();
+  payable.forEach((worker, index) => byWallet.set(worker.wallet, (byWallet.get(worker.wallet) || 0) + perWorker + (index === 0 ? total - perWorker * payable.length : 0)));
+  return Array.from(byWallet, ([wallet, amount]) => ({ wallet, lamports: amount }));
+}
+
 async function reclaimStale(jobs: JobDoc[], workers: WorkerDoc[], now = Date.now()) {
   const liveIds = new Set(live(workers, now).map((w) => w.id));
   return jobs.map((job) => {
-    if (job.status === "running" && job.workerId && !liveIds.has(job.workerId)) {
+    if (job.status === "running") {
+      const remaining = assignedIds(job).filter((id) => liveIds.has(id));
+      if (remaining.length === assignedIds(job).length) return job;
       return {
         ...job,
-        status: "open" as const,
-        workerId: null,
-        workerKind: null,
+        status: remaining.length ? "running" as const : "open" as const,
+        workerId: remaining[0] || null,
+        workerIds: remaining,
+        completedWorkerIds: completedIds(job).filter((id) => remaining.includes(id)),
+        workerKind: remaining.length ? job.workerKind : null,
         updatedAt: now,
       };
     }
@@ -104,20 +141,25 @@ function assign(jobs: JobDoc[], workers: WorkerDoc[], now = Date.now()) {
   const nextJobs = jobs.map((j) => ({ ...j }));
   const nextWorkers = workers.map((w) => ({ ...w }));
 
-  for (const job of nextJobs) {
-    if (job.status !== "open") continue;
-    const eligibleIndex = idle.findIndex((worker) => job.modelSource.startsWith("managed:") || worker.kind === "native");
-    const worker = eligibleIndex >= 0 ? idle.splice(eligibleIndex, 1)[0] : undefined;
-    if (!worker) break;
-    job.status = "running";
-    job.workerId = worker.id;
-    job.workerKind = worker.kind;
-    job.progress = 5;
-    job.updatedAt = now;
-    const row = nextWorkers.find((w) => w.id === worker.id);
-    if (row) {
-      row.status = "busy";
-      row.jobId = job.id;
+  for (const job of nextJobs.sort((a, b) => a.createdAt - b.createdAt)) {
+    if (job.status !== "open" && job.status !== "running") continue;
+    const ids = assignedIds(job);
+    while (ids.length < (job.parallelism || 1)) {
+      const eligibleIndex = idle.findIndex((worker) => !ids.includes(worker.id) && (job.modelSource.startsWith("managed:") || worker.kind === "native"));
+      const worker = eligibleIndex >= 0 ? idle.splice(eligibleIndex, 1)[0] : undefined;
+      if (!worker) break;
+      ids.push(worker.id);
+      job.status = "running";
+      job.workerId = ids[0];
+      job.workerIds = ids;
+      job.completedWorkerIds = completedIds(job);
+      job.workerKind = worker.kind;
+      job.startedAt ||= now;
+      job.readyAt ||= now + (job.estimatedDurationMs || 0);
+      job.progress = 5;
+      job.updatedAt = now;
+      const row = nextWorkers.find((w) => w.id === worker.id);
+      if (row) { row.status = "busy"; row.jobId = job.id; }
     }
   }
 
@@ -137,7 +179,7 @@ export async function listWorkers(): Promise<WorkerDoc[]> {
   const db = await mongoDb();
   const now = Date.now();
   if (db) {
-    await db.collection("workers").deleteMany({ heartbeat: { $lt: now - STALE_MS } });
+    await assignMongo(db, now);
     const workers = (await db.collection("workers").find({}).toArray()) as unknown as WorkerDoc[];
     return live(workers, now);
   }
@@ -186,6 +228,7 @@ export async function heartbeat(input: Omit<WorkerDoc, "name" | "status" | "jobI
       kind: input.kind,
       adapter: input.adapter,
       cores: input.cores,
+      capacityTflops: input.capacityTflops,
       wallet: input.wallet,
       name: existing?.name || workerName(input.id),
       authToken: input.authToken,
@@ -213,6 +256,7 @@ export async function heartbeat(input: Omit<WorkerDoc, "name" | "status" | "jobI
       kind: input.kind,
       adapter: input.adapter,
       cores: input.cores,
+      capacityTflops: input.capacityTflops,
       wallet: input.wallet,
       name: existing?.name || workerName(input.id),
       authToken: input.authToken,
@@ -236,9 +280,11 @@ export async function removeWorker(id: string) {
   if (db) {
     const existing = (await db.collection("workers").findOne({ id })) as unknown as WorkerDoc | null;
     if (existing?.jobId) {
+      const job = (await db.collection("jobs").findOne({ id: existing.jobId })) as unknown as JobDoc | null;
+      const remaining = job ? assignedIds(job).filter((workerId) => workerId !== id) : [];
       await db.collection("jobs").updateOne(
         { id: existing.jobId, status: "running" },
-        { $set: { status: "open", workerId: null, workerKind: null, updatedAt: now } },
+        { $set: { status: remaining.length ? "running" : "open", workerId: remaining[0] || null, workerIds: remaining, completedWorkerIds: job ? completedIds(job).filter((workerId) => workerId !== id) : [], workerKind: remaining.length ? job?.workerKind || null : null, updatedAt: now } },
       );
     }
     await db.collection("workers").deleteOne({ id });
@@ -252,7 +298,7 @@ export async function removeWorker(id: string) {
     if (existing?.jobId) {
       jobs = jobs.map((j) =>
         j.id === existing.jobId && j.status === "running"
-          ? { ...j, status: "open" as const, workerId: null, workerKind: null, updatedAt: now }
+          ? (() => { const remaining = assignedIds(j).filter((workerId) => workerId !== id); return { ...j, status: remaining.length ? "running" as const : "open" as const, workerId: remaining[0] || null, workerIds: remaining, completedWorkerIds: completedIds(j).filter((workerId) => workerId !== id), workerKind: remaining.length ? j.workerKind : null, updatedAt: now }; })()
           : j,
       );
     }
@@ -262,7 +308,7 @@ export async function removeWorker(id: string) {
   });
 }
 
-export async function createJob(input: Omit<JobDoc, "id" | "accessToken" | "status" | "workerId" | "workerKind" | "proof" | "progress" | "parallelism" | "createdAt" | "updatedAt">) {
+export async function createJob(input: Omit<JobDoc, "id" | "accessToken" | "status" | "workerId" | "workerIds" | "completedWorkerIds" | "workerKind" | "proof" | "progress" | "parallelism" | "estimatedDurationMs" | "startedAt" | "readyAt" | "createdAt" | "updatedAt">) {
   const now = Date.now();
   const job: JobDoc = {
     ...input,
@@ -270,10 +316,15 @@ export async function createJob(input: Omit<JobDoc, "id" | "accessToken" | "stat
     accessToken: crypto.randomUUID(),
     status: "open",
     workerId: null,
+    workerIds: [],
+    completedWorkerIds: [],
     workerKind: null,
     proof: null,
     progress: 0,
-    parallelism: 1,
+    parallelism: recommendedParallelism(input.prompt, input.fileData),
+    estimatedDurationMs: estimatedDuration(input.prompt, isAdminWallet(input.wallet)),
+    startedAt: null,
+    readyAt: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -295,32 +346,35 @@ export async function createJob(input: Omit<JobDoc, "id" | "accessToken" | "stat
 }
 
 async function assignMongo(db: Db, now: number) {
+  const run = mongoAssignLock.then(() => assignMongoUnlocked(db, now));
+  mongoAssignLock = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+async function assignMongoUnlocked(db: Db, now: number) {
   await db.collection("workers").deleteMany({ heartbeat: { $lt: now - STALE_MS } });
   const workers = (await db.collection("workers").find({}).toArray()) as unknown as WorkerDoc[];
   const jobs = (await db.collection("jobs").find({}).toArray()) as unknown as JobDoc[];
   const reclaimed = await reclaimStale(jobs, workers, now);
   for (const job of reclaimed) {
-    if (job.status === "open" && jobs.find((j) => j.id === job.id)?.status === "running") {
-      await db.collection("jobs").updateOne(
-        { id: job.id },
-        { $set: { status: "open", workerId: null, workerKind: null, updatedAt: now } },
-      );
-    }
+    const before = jobs.find((item) => item.id === job.id);
+    if (before && (before.status !== job.status || assignedIds(before).join() !== assignedIds(job).join())) await db.collection("jobs").updateOne({ id: job.id }, { $set: { status: job.status, workerId: job.workerId, workerIds: assignedIds(job), completedWorkerIds: completedIds(job), workerKind: job.workerKind, updatedAt: now } });
   }
   const idle = shuffle(live(workers, now).filter((w) => (w.status === "idle" || !w.jobId) && Boolean(w.wallet)));
-  const open = reclaimed.filter((j) => j.status === "open").sort((a, b) => a.createdAt - b.createdAt);
-  for (const job of open) {
-    const eligibleIndex = idle.findIndex((worker) => job.modelSource.startsWith("managed:") || worker.kind === "native");
-    const worker = eligibleIndex >= 0 ? idle.splice(eligibleIndex, 1)[0] : undefined;
-    if (!worker) break;
-    await db.collection("jobs").updateOne(
-      { id: job.id },
-      { $set: { status: "running", workerId: worker.id, workerKind: worker.kind, progress: 5, updatedAt: now } },
-    );
-    await db.collection("workers").updateOne(
-      { id: worker.id },
-      { $set: { status: "busy", jobId: job.id } },
-    );
+  const active = reclaimed.filter((j) => j.status === "open" || j.status === "running").sort((a, b) => a.createdAt - b.createdAt);
+  for (const job of active) {
+    const ids = assignedIds(job);
+    while (ids.length < (job.parallelism || 1)) {
+      const eligibleIndex = idle.findIndex((worker) => !ids.includes(worker.id) && (job.modelSource.startsWith("managed:") || worker.kind === "native"));
+      const worker = eligibleIndex >= 0 ? idle.splice(eligibleIndex, 1)[0] : undefined;
+      if (!worker) break;
+      const startedAt = job.startedAt || now;
+      const readyAt = job.readyAt || startedAt + (job.estimatedDurationMs || 0);
+      const claimedWorker = await db.collection("workers").findOneAndUpdate({ id: worker.id, status: "idle", $or: [{ jobId: null }, { jobId: { $exists: false } }] }, { $set: { status: "busy", jobId: job.id } }, { returnDocument: "after" });
+      if (!claimedWorker) continue;
+      ids.push(worker.id);
+      await db.collection("jobs").updateOne({ id: job.id, status: { $in: ["open", "running"] } }, { $set: { status: "running", workerId: ids[0], workerIds: ids, completedWorkerIds: completedIds(job), workerKind: worker.kind, startedAt, readyAt, progress: 5, updatedAt: now } });
+    }
   }
 }
 
@@ -373,56 +427,22 @@ export async function completeJob(input: { jobId: string; workerId: string; auth
   const now = Date.now();
   const db = await mongoDb();
 
-  const finish = (job: JobDoc, worker: WorkerDoc | undefined, ledger: LedgerEntry[]) => {
-    if (job.status !== "running" || job.workerId !== input.workerId || worker?.authToken !== input.authToken) {
-      throw new Error("This worker is not assigned to that job");
-    }
-    job.status = "done";
-    job.proof = input.proof;
-    job.progress = 100;
-    job.updatedAt = now;
-    if (worker) {
-      worker.status = "idle";
-      worker.jobId = null;
-    }
-    const payWallet = worker?.wallet;
-    if (payWallet && job.lamports > 0) {
-      ledger.push({
-        id: crypto.randomUUID(),
-        wallet: payWallet,
-        lamports: workerShare(job.lamports),
-        kind: "credit",
-        jobId: job.id,
-        sig: job.paySignature,
-        createdAt: now,
-      });
-    }
-  };
-
   if (db) {
     const job = (await db.collection("jobs").findOne({ id: input.jobId })) as unknown as JobDoc | null;
     if (!job) throw new Error("Job not found");
     const worker = (await db.collection("workers").findOne({ id: input.workerId })) as unknown as WorkerDoc | null;
-    if (job.status !== "running" || job.workerId !== input.workerId || worker?.authToken !== input.authToken) {
+    if (job.status !== "running" || !assignedIds(job).includes(input.workerId) || worker?.authToken !== input.authToken) {
       throw new Error("This worker is not assigned to that job");
     }
-    const claimed = await db.collection("jobs").findOneAndUpdate(
-      { id: job.id, status: "running", workerId: input.workerId },
-      { $set: { status: "done", proof: input.proof, progress: 100, updatedAt: now } },
-      { returnDocument: "after" },
-    );
-    if (!claimed) throw new Error("This task has already been completed or stopped");
-    await db.collection("workers").updateOne(
-      { id: input.workerId },
-      { $set: { status: "idle", jobId: null } },
-    );
-    const payWallet = worker?.wallet;
-    if (payWallet && job.lamports > 0) {
-      await db.collection("ledger").updateOne(
-        { jobId: job.id, kind: "credit" },
-        { $setOnInsert: { id: crypto.randomUUID(), wallet: payWallet, lamports: workerShare(job.lamports), kind: "credit", jobId: job.id, sig: job.paySignature, createdAt: now } },
-        { upsert: true },
-      );
+    if (job.readyAt && now < job.readyAt && !isAdminWallet(job.wallet)) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
+    const completed = Array.from(new Set([...completedIds(job), input.workerId]));
+    const participants = assignedIds(job);
+    const done = participants.every((id) => completed.includes(id));
+    await db.collection("jobs").updateOne({ id: job.id, status: "running" }, { $set: { status: done ? "done" : "running", completedWorkerIds: completed, proof: [job.proof, input.proof].filter(Boolean).join("\n---\n"), progress: done ? 100 : Math.max(10, Math.round((completed.length / participants.length) * 90)), updatedAt: now } });
+    await db.collection("workers").updateOne({ id: input.workerId, jobId: job.id }, { $set: { status: "idle", jobId: null } });
+    if (done && job.lamports > 0) {
+      const participantWorkers = (await db.collection("workers").find({ id: { $in: participants } }).toArray()) as unknown as WorkerDoc[];
+      for (const allocation of payoutAllocations(participantWorkers, job.lamports)) await db.collection("ledger").updateOne({ jobId: job.id, kind: "credit", wallet: allocation.wallet }, { $setOnInsert: { id: crypto.randomUUID(), wallet: allocation.wallet, lamports: allocation.lamports, kind: "credit", jobId: job.id, sig: job.paySignature, createdAt: now } }, { upsert: true });
     }
     await assignMongo(db, now);
     return (await db.collection("jobs").findOne({ id: job.id })) as unknown as JobDoc;
@@ -433,7 +453,17 @@ export async function completeJob(input: { jobId: string; workerId: string; auth
     const job = data.jobs.find((j) => j.id === input.jobId);
     if (!job) throw new Error("Job not found");
     const worker = data.workers.find((w) => w.id === input.workerId);
-    finish(job, worker, data.ledger);
+    if (job.status !== "running" || !assignedIds(job).includes(input.workerId) || worker?.authToken !== input.authToken) throw new Error("This worker is not assigned to that job");
+    if (job.readyAt && now < job.readyAt && !isAdminWallet(job.wallet)) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
+    const participants = assignedIds(job);
+    job.completedWorkerIds = Array.from(new Set([...completedIds(job), input.workerId]));
+    const done = participants.every((id) => job.completedWorkerIds.includes(id));
+    job.status = done ? "done" : "running"; job.proof = [job.proof, input.proof].filter(Boolean).join("\n---\n"); job.progress = done ? 100 : Math.max(10, Math.round((job.completedWorkerIds.length / participants.length) * 90)); job.updatedAt = now;
+    if (worker) { worker.status = "idle"; worker.jobId = null; }
+    if (done && job.lamports > 0) {
+      const participantWorkers = data.workers.filter((item) => participants.includes(item.id));
+      for (const allocation of payoutAllocations(participantWorkers, job.lamports)) if (!data.ledger.some((entry) => entry.jobId === job.id && entry.kind === "credit" && entry.wallet === allocation.wallet)) data.ledger.push({ id: crypto.randomUUID(), wallet: allocation.wallet, lamports: allocation.lamports, kind: "credit", jobId: job.id, sig: job.paySignature, createdAt: now });
+    }
     const assigned = assign(data.jobs, data.workers, now);
     await writeFileStore({ ...assigned, ledger: data.ledger });
     return job;
@@ -449,21 +479,19 @@ export async function completeManagedJob(jobId: string, proof: string) {
     if (!job) throw new Error("Task not found");
     if (!job.modelSource.startsWith("managed:")) throw new Error("This is not a managed task");
     if (job.status === "done") return job;
-    if (job.status !== "running" || !job.workerId) throw new Error("Task is waiting for an available worker");
-    const worker = (await db.collection("workers").findOne({ id: job.workerId })) as unknown as WorkerDoc | null;
-    if (!worker?.wallet) throw new Error("Assigned worker has no payout wallet");
+    const participants = assignedIds(job);
+    if (job.status !== "running" || !participants.length) throw new Error("Task is waiting for an available worker");
+    if (job.readyAt && now < job.readyAt && !isAdminWallet(job.wallet)) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
+    const workers = (await db.collection("workers").find({ id: { $in: participants } }).toArray()) as unknown as WorkerDoc[];
+    if (!workers.some((worker) => worker.wallet)) throw new Error("Assigned workers have no payout wallet");
     const claimed = await db.collection("jobs").findOneAndUpdate(
       { id: job.id, status: "running" },
-      { $set: { status: "done", proof, progress: 100, updatedAt: now } },
+      { $set: { status: "done", proof, completedWorkerIds: participants, progress: 100, updatedAt: now } },
       { returnDocument: "after" },
     );
     if (!claimed) return (await db.collection("jobs").findOne({ id: job.id })) as unknown as JobDoc;
-    await db.collection("workers").updateOne({ id: worker.id, jobId: job.id }, { $set: { status: "idle", jobId: null } });
-    await db.collection("ledger").updateOne(
-      { jobId: job.id, kind: "credit" },
-      { $setOnInsert: { id: crypto.randomUUID(), wallet: worker.wallet, lamports: workerShare(job.lamports), kind: "credit", jobId: job.id, sig: job.paySignature, createdAt: now } },
-      { upsert: true },
-    );
+    await db.collection("workers").updateMany({ id: { $in: participants }, jobId: job.id }, { $set: { status: "idle", jobId: null } });
+    for (const allocation of payoutAllocations(workers, job.lamports)) await db.collection("ledger").updateOne({ jobId: job.id, kind: "credit", wallet: allocation.wallet }, { $setOnInsert: { id: crypto.randomUUID(), wallet: allocation.wallet, lamports: allocation.lamports, kind: "credit", jobId: job.id, sig: job.paySignature, createdAt: now } }, { upsert: true });
     await assignMongo(db, now);
     return claimed as unknown as JobDoc;
   }
@@ -473,14 +501,14 @@ export async function completeManagedJob(jobId: string, proof: string) {
     if (!job) throw new Error("Task not found");
     if (!job.modelSource.startsWith("managed:")) throw new Error("This is not a managed task");
     if (job.status === "done") return job;
-    if (job.status !== "running" || !job.workerId) throw new Error("Task is waiting for an available worker");
-    const worker = data.workers.find((item) => item.id === job.workerId);
-    if (!worker?.wallet) throw new Error("Assigned worker has no payout wallet");
-    job.status = "done"; job.proof = proof; job.progress = 100; job.updatedAt = now;
-    worker.status = "idle"; worker.jobId = null;
-    if (!data.ledger.some((entry) => entry.kind === "credit" && entry.jobId === job.id)) {
-      data.ledger.push({ id: crypto.randomUUID(), wallet: worker.wallet, lamports: workerShare(job.lamports), kind: "credit", jobId: job.id, sig: job.paySignature, createdAt: now });
-    }
+    const participants = assignedIds(job);
+    if (job.status !== "running" || !participants.length) throw new Error("Task is waiting for an available worker");
+    if (job.readyAt && now < job.readyAt && !isAdminWallet(job.wallet)) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
+    const workers = data.workers.filter((item) => participants.includes(item.id) && item.wallet);
+    if (!workers.length) throw new Error("Assigned workers have no payout wallet");
+    job.status = "done"; job.proof = proof; job.completedWorkerIds = participants; job.progress = 100; job.updatedAt = now;
+    workers.forEach((worker) => { worker.status = "idle"; worker.jobId = null; });
+    for (const allocation of payoutAllocations(workers, job.lamports)) if (!data.ledger.some((entry) => entry.kind === "credit" && entry.jobId === job.id && entry.wallet === allocation.wallet)) data.ledger.push({ id: crypto.randomUUID(), wallet: allocation.wallet, lamports: allocation.lamports, kind: "credit", jobId: job.id, sig: job.paySignature, createdAt: now });
     const assigned = assign(data.jobs, data.workers, now);
     await writeFileStore({ ...assigned, ledger: data.ledger });
     return job;
@@ -495,7 +523,7 @@ export async function killJob(jobId: string) {
     if (!job) throw new Error("Task not found");
     if (job.status === "done" || job.status === "killed") throw new Error("Only waiting or running tasks can be killed");
     await db.collection("jobs").updateOne({ id: jobId, status: { $in: ["open", "running"] } }, { $set: { status: "killed", proof: "Killed by administrator", progress: 0, updatedAt: now } });
-    if (job.workerId) await db.collection("workers").updateOne({ id: job.workerId, jobId }, { $set: { status: "idle", jobId: null } });
+    if (assignedIds(job).length) await db.collection("workers").updateMany({ id: { $in: assignedIds(job) }, jobId }, { $set: { status: "idle", jobId: null } });
     await assignMongo(db, now);
     return (await db.collection("jobs").findOne({ id: jobId })) as unknown as JobDoc;
   }
@@ -504,9 +532,8 @@ export async function killJob(jobId: string) {
     const job = data.jobs.find((item) => item.id === jobId);
     if (!job) throw new Error("Task not found");
     if (job.status === "done" || job.status === "killed") throw new Error("Only waiting or running tasks can be killed");
-    const worker = job.workerId ? data.workers.find((item) => item.id === job.workerId) : null;
     job.status = "killed"; job.proof = "Killed by administrator"; job.progress = 0; job.updatedAt = now;
-    if (worker) { worker.status = "idle"; worker.jobId = null; }
+    data.workers.filter((worker) => assignedIds(job).includes(worker.id)).forEach((worker) => { worker.status = "idle"; worker.jobId = null; });
     const assigned = assign(data.jobs, data.workers, now);
     await writeFileStore({ ...assigned, ledger: data.ledger });
     return job;

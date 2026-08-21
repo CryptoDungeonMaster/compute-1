@@ -23,10 +23,10 @@ export function ImageComingSoon() {
       const posted = await submitJob({ prompt, modelSource: "managed:image", budget });
       if (posted.error || !posted.job) throw new Error(posted.error || "Escrow funding failed.");
       setMessage("Funded. Randomly matching an online GPU worker…");
-      for (let attempt = 0; attempt < 100; attempt += 1) {
+      for (let attempt = 0; attempt < 140; attempt += 1) {
         const response = await fetch("/api/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "image", prompt, jobId: posted.job.id, accessToken: posted.job.accessToken }) });
         const data = await response.json();
-        if (response.status === 409 && data.waiting) { await wait(3000); continue; }
+        if (response.status === 409 && data.waiting) { setMessage(data.remainingMs ? `Worker matched · about ${Math.max(1, Math.ceil(data.remainingMs / 60000))} min remaining…` : "Funded · waiting for an online GPU worker…"); await wait(3000); continue; }
         if (!response.ok) throw new Error(data.error || "Image generation failed.");
         setImage(data.dataUrl); setMessage("Complete · worker reward is now claimable."); return;
       }
@@ -36,8 +36,8 @@ export function ImageComingSoon() {
   };
 
   return <Panel className="group h-full overflow-hidden p-0 md:p-0">
-    <div className="border-b border-ivory/[.08] bg-gradient-to-br from-[#a855f7]/[.12] via-gold/[.04] to-transparent p-6 md:p-8">
-      <div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Create visuals</p><h2 className="mt-2 text-2xl font-medium tracking-[-.03em] text-ivory">Image studio</h2></div><div className="rounded-xl border border-[#c084fc]/20 bg-[#a855f7]/10 p-3 text-[#d8b4fe]"><ImageIcon size={22}/></div></div>
+    <div className="border-b border-ivory/[.08] bg-[#0a0d0b] p-6 md:p-8">
+      <div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Create visuals</p><h2 className="mt-2 text-2xl font-medium tracking-[-.03em] text-ivory">Image studio</h2></div><div className="rounded-xl border border-gold/20 bg-gold/10 p-3 text-gold"><ImageIcon size={22}/></div></div>
       <p className="mt-3 text-sm leading-relaxed text-stone">Turn a prompt into an image while rewarding a randomly matched online worker.</p>
     </div>
     <div className="p-6 md:p-8">

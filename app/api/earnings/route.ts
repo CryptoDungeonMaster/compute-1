@@ -20,7 +20,9 @@ export async function POST(req: Request) {
     const sig = await payFromEscrow(wallet, earnings.availableLamports);
     await recordPayout({ id: crypto.randomUUID(), wallet, lamports: earnings.availableLamports, kind: "payout", jobId: null, sig, createdAt: Date.now() });
     return NextResponse.json({ signature: sig });
-  } catch {
-    return NextResponse.json({ error: "Claim could not be sent. Check the escrow wallet balance and server configuration." }, { status: 500 });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown settlement error";
+    const safe = detail.includes("ESCROW_SECRET_KEY") || detail.startsWith("Escrow has") ? detail : `Solana payout failed: ${detail}`;
+    return NextResponse.json({ error: safe }, { status: 500 });
   }
 }
