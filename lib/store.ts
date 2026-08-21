@@ -338,6 +338,12 @@ export async function getEarnings(wallet: string): Promise<Earnings> {
   });
 }
 
+export async function listLedger(): Promise<LedgerEntry[]> {
+  const db = await mongoDb();
+  if (db) return (await db.collection("ledger").find({}).sort({ createdAt: -1 }).limit(500).toArray()) as unknown as LedgerEntry[];
+  return withFileLock(async () => (await readFileStore()).ledger.sort((a, b) => b.createdAt - a.createdAt));
+}
+
 export async function completeJob(input: { jobId: string; workerId: string; authToken: string; proof: string }) {
   const now = Date.now();
   const db = await mongoDb();

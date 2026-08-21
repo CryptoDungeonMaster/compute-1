@@ -22,15 +22,18 @@ export const metadata: Metadata = {
     title: "ComputeFi — Put idle compute to work.",
     description:
     "The decentralized compute marketplace on Solana.",
-    images: ["/hero.jpg"],
+    images: ["/logo.png"],
     type: "website",
   },
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
     ],
+    apple: "/apple-touch-icon.png",
   },
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({

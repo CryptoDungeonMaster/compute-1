@@ -1,28 +1,28 @@
 #!/usr/bin/env node
 /**
- * Tap Power native GPU worker
+ * ComputeFi native GPU worker
  *
  * Uses your machine GPU (NVIDIA via nvidia-smi, else CPU name) and
- * registers as a worker on the Tap Power mesh. Open jobs are assigned
+ * registers as a worker on the ComputeFi mesh. Open jobs are assigned
  * to idle workers automatically.
  *
- *   node tap-power-worker.mjs
+ *   node computefi-worker.mjs
  *
  * Optional env:
- *   TAP_POWER_URL     site origin, default http://localhost:3000
- *   TAP_POWER_WALLET  Solana address to credit
- *   TAP_POWER_EXECUTOR path to a local executable that receives the job in TAP_POWER_JOB
+ *   COMPUTEFI_URL     site origin, default http://localhost:3000
+ *   COMPUTEFI_WALLET  Solana address to credit
+ *   COMPUTEFI_EXECUTOR path to a local executable that receives the job in COMPUTEFI_JOB
  */
 
 import { execSync, spawnSync } from "node:child_process";
 import os from "node:os";
 import { randomUUID } from "node:crypto";
 
-const BASE = (process.env.TAP_POWER_URL || "http://localhost:3000").replace(/\/$/, "");
-const WALLET = process.env.TAP_POWER_WALLET || null;
-const ID = process.env.TAP_POWER_WORKER_ID || `native-${randomUUID()}`;
-const AUTH_TOKEN = process.env.TAP_POWER_WORKER_TOKEN || randomUUID();
-const EXECUTOR = process.env.TAP_POWER_EXECUTOR || null;
+const BASE = (process.env.COMPUTEFI_URL || "http://localhost:3000").replace(/\/$/, "");
+const WALLET = process.env.COMPUTEFI_WALLET || null;
+const ID = process.env.COMPUTEFI_WORKER_ID || `native-${randomUUID()}`;
+const AUTH_TOKEN = process.env.COMPUTEFI_WORKER_TOKEN || randomUUID();
+const EXECUTOR = process.env.COMPUTEFI_EXECUTOR || null;
 
 function gpuName() {
   try {
@@ -41,7 +41,7 @@ function gpuName() {
 }
 
 const adapter = gpuName();
-console.log(`Tap Power native worker`);
+console.log(`ComputeFi native worker`);
 console.log(`  id      ${ID}`);
 console.log(`  adapter ${adapter}`);
 console.log(`  mesh    ${BASE}`);
@@ -81,14 +81,14 @@ async function leave() {
 
 async function runJob(job) {
   if (!EXECUTOR) {
-    console.log("  Waiting: set TAP_POWER_EXECUTOR before this worker can run and settle jobs.");
+    console.log("  Waiting: set COMPUTEFI_EXECUTOR before this worker can run and settle jobs.");
     return;
   }
   const isNodeScript = EXECUTOR.endsWith(".mjs") || EXECUTOR.endsWith(".js");
   const result = spawnSync(isNodeScript ? process.execPath : EXECUTOR, isNodeScript ? [EXECUTOR] : [], {
-    env: { ...process.env, TAP_POWER_JOB: JSON.stringify(job) },
+    env: { ...process.env, COMPUTEFI_JOB: JSON.stringify(job) },
     encoding: "utf8",
-    timeout: Number(process.env.TAP_POWER_TIMEOUT_MS || 1800000),
+    timeout: Number(process.env.COMPUTEFI_TIMEOUT_MS || 1800000),
   });
   if (result.error || result.status !== 0) {
     console.error(`  Runner failed: ${result.error?.message || result.stderr || `exit ${result.status}`}`);

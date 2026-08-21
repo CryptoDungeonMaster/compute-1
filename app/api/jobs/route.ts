@@ -7,7 +7,8 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const jobs = await listJobs();
-  return NextResponse.json({ jobs, mongo: usingMongo() });
+  const visible = jobs.map(({ wallet, paySignature, fileData, proof, ...job }) => job);
+  return NextResponse.json({ jobs: visible, mongo: usingMongo() });
 }
 
 export async function POST(req: Request) {

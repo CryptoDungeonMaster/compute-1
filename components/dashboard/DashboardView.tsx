@@ -7,8 +7,9 @@ import { Button, EmptyState, Panel, Section, StatusPill } from "@/components/ui"
 import { useMesh } from "@/components/MeshProvider";
 import { shortenAddress } from "@/lib/utils";
 import type { Earnings } from "@/lib/types";
+import { AdminOverview } from "@/components/dashboard/AdminOverview";
 
-const SETTINGS_KEY = "tappower.settings";
+const SETTINGS_KEY = "computefi.settings";
 
 type Settings = {
   idleOnly: boolean;
@@ -155,6 +156,7 @@ export function DashboardView() {
           <h2 className="font-display text-2xl italic text-ivory">Transactions</h2>
           {!earnings?.entries.length ? <p className="mt-6 text-sm leading-relaxed text-stone">No settlement transactions for this wallet yet. Fund a job, complete it with a native executor, then claim it to create on-chain signatures.</p> : <ul className="mt-6 divide-y divide-ivory/10 border-y border-ivory/10">{earnings.entries.map((entry) => <li key={entry.id} className="py-3 text-sm"><span className="text-ivory">{entry.kind === "credit" ? "Work credited" : "SOL claimed"}</span><span className="ml-3 text-stone">{(entry.lamports / 1e9).toFixed(4)} SOL</span>{entry.sig ? <a className="ml-3 text-gold hover:text-ivory" target="_blank" rel="noreferrer" href={`https://explorer.solana.com/tx/${entry.sig}`}>View signature</a> : null}</li>)}</ul>}
         </Panel>
+        <AdminOverview />
       </Section>
     </div>
   );

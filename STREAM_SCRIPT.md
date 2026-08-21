@@ -1,8 +1,8 @@
-# Tap Power Stream Script
+# ComputeFi Stream Script
 
 ## Opening — 30 seconds
 
-“What you are looking at is Tap Power. It is a way to send a compute job to an available machine and pay for completed work in SOL.
+“What you are looking at is ComputeFi. It is a way to send a compute job to an available machine and pay for completed work in SOL.
 
 The simple idea is: someone needs work done, they post the job and fund it. A worker machine takes the job, runs an approved local tool, and earns SOL after it finishes.
 
@@ -10,7 +10,7 @@ This is not a magic website that turns every browser into a supercomputer. It is
 
 ## Show the home page
 
-“There are two sides to Tap Power.
+“There are two sides to ComputeFi.
 
 Rent is for people who want something done. Earn is for machines that want to do work and earn SOL.
 
@@ -62,7 +62,7 @@ Also write five tests for it.
 
 Open Earn or show the worker terminal/log.
 
-“This machine is the worker. It is my PC, so I control what it can run. It is connected outward to the Tap Power site; I do not need to open my home PC to the internet.
+“This machine is the worker. It is my PC, so I control what it can run. It is connected outward to the ComputeFi site; I do not need to open my home PC to the internet.
 
 The worker sends a heartbeat every few seconds. That is why it appears as available on Rent.
 
@@ -109,7 +109,7 @@ Multiple workers on a single job will come after we add real sharding. We do not
 
 ## Close
 
-“That is Tap Power: a transparent way to turn approved local compute into paid work.
+“That is ComputeFi: a transparent way to turn approved local compute into paid work.
 
 Renters can see jobs and workers. Worker owners control their hardware and allowed tools. Payments are in SOL, backed by escrow, and verified with real transaction signatures.
 

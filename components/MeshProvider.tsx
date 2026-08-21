@@ -12,9 +12,9 @@ type MeshContextValue = {
   startSharing: () => void; stopSharing: () => void; submitJob: (input: JobInput) => Promise<{ error?: string }>;
 };
 const MeshContext = createContext<MeshContextValue | null>(null);
-const TAB_KEY = "tappower.tabId";
-const SHARE_KEY = "tappower.sharing";
-const TOKEN_KEY = "tappower.workerToken";
+const TAB_KEY = "computefi.tabId";
+const SHARE_KEY = "computefi.sharing";
+const TOKEN_KEY = "computefi.workerToken";
 function tabId() { let id = sessionStorage.getItem(TAB_KEY); if (!id) { id = crypto.randomUUID(); sessionStorage.setItem(TAB_KEY, id); } return id; }
 function workerToken() { let token = sessionStorage.getItem(TOKEN_KEY); if (!token) { token = crypto.randomUUID(); sessionStorage.setItem(TOKEN_KEY, token); } return token; }
 

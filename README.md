@@ -1,6 +1,6 @@
-# Tap Power
+# ComputeFi
 
-Tap Power is a small Solana-funded compute board. Renters describe work, select a Hugging Face model or direct model link, optionally attach a small input file, and fund the job in SOL. Available workers receive the oldest paid job. When a native worker's configured executor finishes, the worker's SOL share becomes claimable.
+ComputeFi is a small Solana-funded compute board. Renters describe work, select a Hugging Face model or direct model link, optionally attach a small input file, and fund the job in SOL. Available workers receive the oldest paid job. When a native worker's configured executor finishes, the worker's SOL share becomes claimable.
 
 This is intentionally a coordination and settlement layer. It is not a general-purpose distributed model runtime by itself. A worker needs a local runner that knows how to download/load the requested model and execute the requested work.
 
@@ -18,7 +18,7 @@ This is intentionally a coordination and settlement layer. It is not a general-p
 
 Sharing a browser tab does **not** execute a Hugging Face model. It makes that browser visible and eligible for work, but there is no browser inference engine included in this repository.
 
-The native worker also does not guess how to run every model. It needs `TAP_POWER_EXECUTOR`, an executable you operate. The worker supplies the full assigned job as JSON in `TAP_POWER_JOB`. That executable must exit with status `0` only when the requested work has completed. Its standard output is retained as the completion proof.
+The native worker also does not guess how to run every model. It needs `COMPUTEFI_EXECUTOR`, an executable you operate. The worker supplies the full assigned job as JSON in `COMPUTEFI_JOB`. That executable must exit with status `0` only when the requested work has completed. Its standard output is retained as the completion proof.
 
 This separation is deliberate: executing arbitrary renter prompts, model links, or shell strings without an operator-controlled runner would be unsafe.
 
@@ -47,7 +47,7 @@ Do not commit `.env.local`. `ESCROW_SECRET_KEY` is a hot-wallet private key. It 
 
 Yes, escrow is needed for the current paid-job flow. Without it, the app could not safely wait for a worker to complete before a payout is authorized.
 
-1. Create a new dedicated Solana keypair for Tap Power. Do not use your personal wallet.
+1. Create a new dedicated Solana keypair for ComputeFi. Do not use your personal wallet.
 2. Export that keypair as the JSON byte array required by `ESCROW_SECRET_KEY` and place it only in the hosting provider's encrypted server environment.
 3. Fund it with a small amount of SOL for outbound transaction fees. Renter job payments will also arrive here.
 4. Start the server once and visit `/api/escrow`. It returns the public address used by the Rent page.
@@ -62,7 +62,7 @@ The current escrow model is custodial: the server holding `ESCROW_SECRET_KEY` ca
 1. Go to **Rent** and connect a Solana wallet.
 2. Write a plain description of the task.
 3. Paste a Hugging Face ID such as `meta-llama/Llama-3.1-8B-Instruct`, or a direct model URL. This field is optional because some executors may use a preinstalled model.
-4. Optionally upload a small input file (maximum 1 MB). The file is stored with the job record so a native executor can read it from `TAP_POWER_JOB`.
+4. Optionally upload a small input file (maximum 1 MB). The file is stored with the job record so a native executor can read it from `COMPUTEFI_JOB`.
 5. Enter the SOL budget. SOL is the only payment and settlement currency.
 6. Click **Pay SOL & post job** and approve the wallet transaction.
 
@@ -85,12 +85,12 @@ This creates a WebGPU worker heartbeat. It is useful for presence testing and fo
 
 On Windows, use **Windows quick start** on the Earn page. It downloads one launcher file; double-click it, enter the wallet address, and it downloads and starts the worker from your current site. Node 18+ is still required.
 
-To configure it manually, download `tap-power-worker.mjs`, install Node 18+, and run:
+To configure it manually, download `computefi-worker.mjs`, install Node 18+, and run:
 
 ```powershell
-$env:TAP_POWER_URL="https://your-domain.example"
-$env:TAP_POWER_WALLET="YourSolanaAddress"
-node .\tap-power-worker.mjs
+$env:COMPUTEFI_URL="https://your-domain.example"
+$env:COMPUTEFI_WALLET="YourSolanaAddress"
+node .\computefi-worker.mjs
 ```
 
 The console prints the worker ID, detected adapter, site address, and whether an executor is configured. Keep it open; press Ctrl+C to unregister.
@@ -99,38 +99,38 @@ For an NVIDIA machine, ensure `nvidia-smi` is on the path. Its presence is used 
 
 ### Make the native worker execute work
 
-Create or install a local executable that performs the model-specific work. Set its path as `TAP_POWER_EXECUTOR`:
+Create or install a local executable that performs the model-specific work. Set its path as `COMPUTEFI_EXECUTOR`:
 
 ```powershell
-$env:TAP_POWER_URL="https://your-domain.example"
-$env:TAP_POWER_WALLET="YourSolanaAddress"
-$env:TAP_POWER_EXECUTOR="C:\workers\run-tap-job.exe"
-node .\tap-power-worker.mjs
+$env:COMPUTEFI_URL="https://your-domain.example"
+$env:COMPUTEFI_WALLET="YourSolanaAddress"
+$env:COMPUTEFI_EXECUTOR="C:\workers\run-computefi-job.exe"
+node .\computefi-worker.mjs
 ```
 
-For every assigned job, Tap Power launches that executable with an environment variable:
+For every assigned job, ComputeFi launches that executable with an environment variable:
 
 ```text
-TAP_POWER_JOB={"id":"...","prompt":"...","modelSource":"...","fileName":"...","fileData":"...",...}
+COMPUTEFI_JOB={"id":"...","prompt":"...","modelSource":"...","fileName":"...","fileData":"...",...}
 ```
 
-Your runner should parse that JSON, enforce its own allowed-model and resource policy, execute the task, print a short result/proof to standard output, and exit `0`. A nonzero exit code leaves the job assigned and logs the failure; it does not pay the worker. The default timeout is 30 minutes and can be changed with `TAP_POWER_TIMEOUT_MS`.
+Your runner should parse that JSON, enforce its own allowed-model and resource policy, execute the task, print a short result/proof to standard output, and exit `0`. A nonzero exit code leaves the job assigned and logs the failure; it does not pay the worker. The default timeout is 30 minutes and can be changed with `COMPUTEFI_TIMEOUT_MS`.
 
 Keep the runner narrow. Good runners accept a fixed approved set of model IDs and a structured prompt format. Do not turn arbitrary job text into a shell command. Treat model URLs and attached files as untrusted input.
 
 ### Fast starter executor: Ollama
 
-The repository includes `tap-power-ollama-executor.mjs`. It runs a local, allow-listed Ollama model and is the quickest way to test real execution. First install Ollama, then download a model on each worker machine:
+The repository includes `computefi-ollama-executor.mjs`. It runs a local, allow-listed Ollama model and is the quickest way to test real execution. First install Ollama, then download a model on each worker machine:
 
 ```powershell
 ollama pull llama3.2:3b
-$env:TAP_POWER_OLLAMA_MODEL="llama3.2:3b"
-$env:TAP_POWER_ALLOWED_MODELS="llama3.2:3b"
-$env:TAP_POWER_EXECUTOR="C:\path\to\tap-power-ollama-executor.mjs"
-node .\tap-power-worker.mjs
+$env:COMPUTEFI_OLLAMA_MODEL="llama3.2:3b"
+$env:COMPUTEFI_ALLOWED_MODELS="llama3.2:3b"
+$env:COMPUTEFI_EXECUTOR="C:\path\to\computefi-ollama-executor.mjs"
+node .\computefi-worker.mjs
 ```
 
-The native worker recognizes `.mjs` executors and runs them with Node. Renters should request `ollama:llama3.2:3b`. The executor refuses any model not in `TAP_POWER_ALLOWED_MODELS`. The Windows quick-start downloader can configure this automatically after Ollama and the selected model are installed.
+The native worker recognizes `.mjs` executors and runs them with Node. Renters should request `ollama:llama3.2:3b`. The executor refuses any model not in `COMPUTEFI_ALLOWED_MODELS`. The Windows quick-start downloader can configure this automatically after Ollama and the selected model are installed.
 
 ## Settlement and claims
 
