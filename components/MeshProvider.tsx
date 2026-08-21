@@ -9,7 +9,7 @@ import type { JobDoc, WorkerDoc } from "@/lib/types";
 type JobInput = { prompt: string; modelSource: string; fileName?: string; fileData?: string | null; budget: string };
 type MeshContextValue = {
   device: DeviceInfo | null; sharing: boolean; workers: WorkerDoc[]; jobs: JobDoc[]; assignedJob: JobDoc | null; tabId: string | null; mongo: boolean;
-  startSharing: () => void; stopSharing: () => void; submitJob: (input: JobInput) => Promise<{ error?: string }>;
+  startSharing: () => void; stopSharing: () => void; submitJob: (input: JobInput) => Promise<{ error?: string; job?: JobDoc }>;
 };
 const MeshContext = createContext<MeshContextValue | null>(null);
 const TAB_KEY = "computefi.tabId";
@@ -42,7 +42,7 @@ export function MeshProvider({ children }: { children: React.ReactNode }) {
     try {
       const transaction = new Transaction().add(SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: new PublicKey(escrow.address), lamports: Math.round(sol * 1_000_000_000) }));
       const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.mainnet-beta.solana.com", "confirmed"); const signature = await sendTransaction(transaction, connection); await connection.confirmTransaction(signature, "confirmed");
-      const response = await fetch("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...input, paySignature: signature, wallet }) }); const data = await response.json(); if (!response.ok) return { error: data.error || "The payment was sent, but the job could not be posted." };
+      const response = await fetch("/api/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...input, paySignature: signature, wallet }) }); const data = await response.json(); if (!response.ok) return { error: data.error || "The payment was sent, but the job could not be posted." }; await refresh(); return { job: data.job };
     } catch (error) { return { error: error instanceof Error ? error.message : "Wallet payment was cancelled." }; }
     await refresh(); return {};
   }, [publicKey, sendTransaction, wallet, refresh]);

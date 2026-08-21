@@ -31,7 +31,7 @@ export function AdminOverview() {
         const challenge = await challengeResponse.json();
         if (!challengeResponse.ok) throw new Error(challenge.error || "Unable to request administrator access.");
         const signature = await signMessage(new TextEncoder().encode(challenge.message));
-        const response = await fetch("/api/admin/overview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet, message: challenge.message, signature: signatureToBase64(signature) }) });
+        const response = await fetch("/api/admin/overview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet, message: challenge.message, token: challenge.token, signature: signatureToBase64(signature) }) });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Administrator verification failed.");
         if (active) { setOverview(data); setMessage(""); }

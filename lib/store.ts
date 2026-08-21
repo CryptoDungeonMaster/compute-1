@@ -151,6 +151,12 @@ export async function listJobs(): Promise<JobDoc[]> {
   });
 }
 
+export async function getJob(id: string): Promise<JobDoc | null> {
+  const db = await mongoDb();
+  if (db) return (await db.collection("jobs").findOne({ id })) as unknown as JobDoc | null;
+  return withFileLock(async () => (await readFileStore()).jobs.find((job) => job.id === id) ?? null);
+}
+
 export async function heartbeat(input: Omit<WorkerDoc, "name" | "status" | "jobId" | "heartbeat"> & { jobId?: string | null }) {
   const now = Date.now();
   const db = await mongoDb();
