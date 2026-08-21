@@ -5,6 +5,7 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  SendTransactionError,
   SystemProgram,
   Transaction,
   clusterApiUrl,
@@ -108,18 +109,29 @@ export async function payFromEscrow(to: string, lamports: number) {
   const kp = await getEscrowKeypair();
   const conn = connection();
   const balance = await conn.getBalance(kp.publicKey, "confirmed");
+  const rentReserve = await conn.getMinimumBalanceForRentExemption(0, "confirmed");
   const feeReserve = 10_000;
-  if (balance < lamports + feeReserve) throw new Error(`Escrow has ${(balance / LAMPORTS_PER_SOL).toFixed(4)} SOL but needs ${((lamports + feeReserve) / LAMPORTS_PER_SOL).toFixed(4)} SOL including network fees.`);
+  const spendable = Math.max(0, balance - rentReserve - feeReserve);
+  if (!spendable) throw new Error(`Escrow reserve is underfunded. Add at least ${((rentReserve + feeReserve - balance) / LAMPORTS_PER_SOL).toFixed(6)} SOL to ${kp.publicKey.toBase58()} once, then retry.`);
+  const payoutLamports = Math.min(lamports, spendable);
   const dest = new PublicKey(to);
   const tx = new Transaction().add(
     SystemProgram.transfer({
       fromPubkey: kp.publicKey,
       toPubkey: dest,
-      lamports,
+      lamports: payoutLamports,
     }),
   );
-  const sig = await sendAndConfirmTransaction(conn, tx, [kp]);
-  return sig;
+  try {
+    const signature = await sendAndConfirmTransaction(conn, tx, [kp]);
+    return { signature, lamports: payoutLamports, partial: payoutLamports < lamports };
+  } catch (error) {
+    if (error instanceof SendTransactionError) {
+      const logs = await error.getLogs(conn).catch(() => null);
+      throw new Error(`${error.message}${logs?.length ? ` · ${logs.join(" · ")}` : ""}`);
+    }
+    throw error;
+  }
 }
 
 export async function getEscrowBalance() {

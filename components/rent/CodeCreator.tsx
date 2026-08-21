@@ -35,7 +35,7 @@ export function CodeCreator() {
   };
 
   return <Panel className="group h-full overflow-hidden p-0 md:p-0">
-    <div className="border-b border-ivory/[.08] bg-[#0a0d0b] p-6 md:p-8">
+    <div className="border-b border-ivory/[.08] p-6 md:p-8">
       <div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Build with AI</p><h2 className="mt-2 text-2xl font-medium tracking-[-.03em] text-ivory">Code studio</h2></div><div className="rounded-xl border border-gold/20 bg-gold/10 p-3 text-gold"><Braces size={22}/></div></div>
       <p className="mt-3 max-w-xl text-sm leading-relaxed text-stone">Describe what you need. An online worker is selected at random and earns your settled reward.</p>
     </div>

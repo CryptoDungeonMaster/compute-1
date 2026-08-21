@@ -82,7 +82,8 @@ async function leave() {
   }
 }
 
-async function runJob(job) {
+async function runJob(initialJob) {
+  let job = initialJob;
   if (!EXECUTOR) {
     console.log("  Waiting: set COMPUTEFI_EXECUTOR before this worker can run and settle jobs.");
     return;
@@ -91,7 +92,8 @@ async function runJob(job) {
     const seconds = Math.max(1, Math.ceil((job.readyAt - Date.now()) / 1000));
     process.stdout.write(`\rprocessing window ${seconds}s remaining   `);
     await new Promise((resolve) => setTimeout(resolve, Math.min(3000, job.readyAt - Date.now())));
-    await beat();
+    const heartbeat = await beat();
+    if (heartbeat.job) job = heartbeat.job;
   }
   const isNodeScript = EXECUTOR.endsWith(".mjs") || EXECUTOR.endsWith(".js");
   const result = spawnSync(isNodeScript ? process.execPath : EXECUTOR, isNodeScript ? [EXECUTOR] : [], {

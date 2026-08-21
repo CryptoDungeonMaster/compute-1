@@ -7,7 +7,7 @@ type ButtonVariant = "primary" | "secondary" | "ghost";
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "border-gold/50 bg-gold text-[#03140b] shadow-[0_8px_28px_rgba(0,232,120,.16)] hover:border-emerald-bright hover:bg-emerald-bright hover:shadow-[0_12px_34px_rgba(0,232,120,.24)]",
+    "border-gold/50 bg-transparent text-gold hover:border-gold hover:bg-gold/10",
   secondary:
     "bg-transparent text-ivory border-ivory/20 hover:border-gold/70 hover:text-gold",
   ghost: "bg-transparent text-ivory/70 border-transparent hover:text-ivory",
@@ -31,7 +31,7 @@ export function Button({
   disabled?: boolean;
 }) {
   const classes = cn(
-    "inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-[11px] font-semibold tracking-[0.12em] uppercase transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40",
+    "inline-flex min-h-10 items-center justify-center gap-2 border px-4 py-2.5 text-[11px] font-medium tracking-[0.16em] uppercase transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40",
     variants[variant],
     className,
   );
@@ -61,7 +61,7 @@ export function Panel({
   id?: string;
 }) {
   return (
-    <div id={id} className={cn("panel rounded-2xl p-6 md:p-8", className)}>
+    <div id={id} className={cn("panel p-6 md:p-8", className)}>
       {children}
     </div>
   );

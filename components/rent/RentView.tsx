@@ -41,7 +41,6 @@ export function RentView() {
 
   return <div>
     <section className="relative mx-auto max-w-page px-6 pb-14 pt-28 md:pt-36">
-      <div className="absolute left-6 top-28 h-24 w-24 rounded-full bg-gold/10 blur-3xl"/>
       <p className="eyebrow">Compute marketplace · live</p>
       <h1 className="mt-5 max-w-4xl text-5xl font-medium leading-[.98] tracking-[-.065em] text-ivory md:text-7xl">Create at network speed.<br/><span className="text-gold">Reward real compute.</span></h1>
       <p className="mt-7 max-w-2xl text-lg leading-relaxed text-stone">Fund a task from 0.01 SOL. It locks in escrow, matches a random online worker, and becomes claimable after completion.</p>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { OctagonX, RefreshCw, ShieldCheck } from "lucide-react";
+import { OctagonX, RefreshCw, ShieldCheck, Zap } from "lucide-react";
 import { Button, Panel, StatusPill } from "@/components/ui";
 import { shortenAddress } from "@/lib/utils";
 import type { JobDoc, LedgerEntry, WorkerDoc } from "@/lib/types";
@@ -21,6 +21,7 @@ export function AdminOverview() {
   const [proof, setProof] = useState<AdminProof | null>(null);
   const [message, setMessage] = useState("Requesting administrator access…");
   const [killing, setKilling] = useState<string | null>(null);
+  const [speeding, setSpeeding] = useState<string | null>(null);
   const wallet = publicKey?.toBase58();
 
   const loadOverview = useCallback(async (auth: AdminProof) => {
@@ -59,6 +60,18 @@ export function AdminOverview() {
     finally { setKilling(null); }
   };
 
+  const expedite = async (jobId: string) => {
+    if (!proof) return;
+    setSpeeding(jobId); setMessage("Advancing the task processing window…");
+    try {
+      const response = await fetch("/api/admin/jobs/expedite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...proof, jobId }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Task could not be sped up.");
+      await loadOverview(proof); setMessage("Task is ready to complete now.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Task could not be sped up."); }
+    finally { setSpeeding(null); }
+  };
+
   if (wallet !== ADMIN_WALLET) return null;
   if (!overview) return <Panel className="mt-4"><p className="eyebrow">Administrator</p><p className="mt-3 text-sm text-stone">{message}</p></Panel>;
 
@@ -75,7 +88,7 @@ export function AdminOverview() {
     </div>
 
     <Panel><div className="flex items-end justify-between gap-4"><div><p className="eyebrow">Operations</p><h3 className="mt-2 text-xl font-medium text-ivory">All renter tasks</h3></div><p className="hidden text-xs text-stone sm:block">Kill releases the worker and prevents settlement.</p></div>
-      {overview.jobs.length ? <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-xs"><thead className="border-y border-ivory/10 font-mono text-[9px] tracking-[.14em] text-stone"><tr><th className="py-3 font-normal">TASK</th><th className="font-normal">RENTER</th><th className="font-normal">WORKER</th><th className="font-normal">REWARD</th><th className="font-normal">STATUS</th><th className="text-right font-normal">CONTROL</th></tr></thead><tbody>{overview.jobs.map((job) => { const active = job.status === "open" || job.status === "running"; return <tr key={job.id} className="border-b border-ivory/[.06] text-ivory"><td className="max-w-[250px] py-4 pr-6"><p className="truncate">{job.prompt}</p><p className="mt-1 font-mono text-[10px] text-stone">{job.id}</p></td><td className="font-mono text-[10px]">{job.wallet ? shortenAddress(job.wallet, 6) : "—"}</td><td className="font-mono text-[10px]">{job.workerId ? shortenAddress(job.workerId, 6) : "UNMATCHED"}</td><td className="font-mono">{job.budget} SOL</td><td className={job.status === "done" ? "text-gold" : job.status === "killed" ? "text-red-400" : "text-stone"}>{job.status.toUpperCase()}</td><td className="py-2 text-right">{active ? <Button variant="secondary" onClick={() => kill(job.id)} disabled={Boolean(killing)} className="border-red-400/25 px-3 py-2 text-red-300 hover:border-red-400/60 hover:text-red-200"><OctagonX size={13}/>{killing === job.id ? "Stopping" : "Kill"}</Button> : <span className="text-[10px] uppercase tracking-[.16em] text-stone/50">Closed</span>}</td></tr>; })}</tbody></table></div> : <p className="mt-5 text-sm text-stone">No tasks posted.</p>}
+      {overview.jobs.length ? <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[820px] text-left text-xs"><thead className="border-y border-ivory/10 font-mono text-[9px] tracking-[.14em] text-stone"><tr><th className="py-3 font-normal">TASK</th><th className="font-normal">RENTER</th><th className="font-normal">WORKER</th><th className="font-normal">REWARD</th><th className="font-normal">STATUS</th><th className="text-right font-normal">CONTROL</th></tr></thead><tbody>{overview.jobs.map((job) => { const active = job.status === "open" || job.status === "running"; const canSpeed = job.status === "running" && Boolean(job.readyAt && job.readyAt > Date.now()); return <tr key={job.id} className="border-b border-ivory/[.06] text-ivory"><td className="max-w-[250px] py-4 pr-6"><p className="truncate">{job.prompt}</p><p className="mt-1 font-mono text-[10px] text-stone">{job.id}</p></td><td className="font-mono text-[10px]">{job.wallet ? shortenAddress(job.wallet, 6) : "—"}</td><td className="font-mono text-[10px]">{job.workerId ? shortenAddress(job.workerId, 6) : "UNMATCHED"}</td><td className="font-mono">{job.budget} SOL</td><td className={job.status === "done" ? "text-gold" : job.status === "killed" ? "text-red-400" : "text-stone"}>{job.status.toUpperCase()}</td><td className="py-2 text-right">{active ? <div className="flex justify-end gap-2">{canSpeed ? <Button variant="secondary" onClick={() => expedite(job.id)} disabled={Boolean(speeding || killing)} className="px-3 py-2"><Zap size={13}/>{speeding === job.id ? "Advancing" : "Finish now"}</Button> : null}<Button variant="secondary" onClick={() => kill(job.id)} disabled={Boolean(killing || speeding)} className="border-red-400/25 px-3 py-2 text-red-300 hover:border-red-400/60 hover:text-red-200"><OctagonX size={13}/>{killing === job.id ? "Stopping" : "Kill"}</Button></div> : <span className="text-[10px] uppercase tracking-[.16em] text-stone/50">Closed</span>}</td></tr>; })}</tbody></table></div> : <p className="mt-5 text-sm text-stone">No tasks posted.</p>}
     </Panel>
   </section>;
 }

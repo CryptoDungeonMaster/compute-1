@@ -25,7 +25,7 @@ export function Hero() {
         <p className="mt-7 max-w-xl text-base leading-relaxed text-stone md:text-lg">A direct market for GPU work. Rent capacity, verify the result, then release SOL to the machines that completed it.</p>
         <div className="mt-9 flex flex-wrap gap-3"><Button href="/earn">Start earning <ArrowUpRight size={14}/></Button><Button href="/rent" variant="secondary">Rent compute</Button></div>
       </motion.div>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: .25, duration: .8 }} className="relative hidden lg:block"><NetworkMesh compact/><p className="absolute bottom-[7%] left-1/2 -translate-x-1/2 whitespace-nowrap font-mono text-[8px] uppercase tracking-[.18em] text-stone">job routing · proof · settlement</p></motion.div>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: .25, duration: .8 }} className="relative hidden lg:block"><NetworkMesh compact/></motion.div>
       <div className="col-span-full grid grid-cols-2 border-y border-ivory/[.1] sm:grid-cols-4">{metrics.map(([value, label], index) => <div key={label} className={`py-4 ${index ? "border-l border-ivory/[.1] pl-4 sm:pl-6" : "pr-4"}`}><p className="font-mono text-sm text-ivory">{value}</p><p className="mt-1 text-[9px] uppercase tracking-[.16em] text-stone">{label}</p></div>)}</div>
     </div>
     <div className="compute-stream absolute bottom-0 h-px w-full bg-ivory/[.08]"/>

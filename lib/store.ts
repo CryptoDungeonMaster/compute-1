@@ -3,7 +3,6 @@ import path from "path";
 import { MongoClient, type Db } from "mongodb";
 import type { Earnings, JobDoc, LedgerEntry, WorkerDoc } from "@/lib/types";
 import { workerShare } from "@/lib/escrow";
-import { isAdminWallet } from "@/lib/admin";
 
 const STALE_MS = 20_000;
 const FILE = path.join(process.cwd(), ".data", "mesh.json");
@@ -99,8 +98,7 @@ function recommendedParallelism(prompt: string, fileData: string | null) {
   return weight >= 2_500 ? 3 : weight >= 800 ? 2 : 1;
 }
 
-function estimatedDuration(prompt: string, admin: boolean) {
-  if (admin) return 0;
+function estimatedDuration(prompt: string) {
   const lengthWeight = Math.min(1, prompt.trim().length / 4_000);
   const jitter = Math.floor(Math.random() * 25_000);
   return Math.min(300_000, Math.round(30_000 + lengthWeight * 245_000 + jitter));
@@ -322,7 +320,7 @@ export async function createJob(input: Omit<JobDoc, "id" | "accessToken" | "stat
     proof: null,
     progress: 0,
     parallelism: recommendedParallelism(input.prompt, input.fileData),
-    estimatedDurationMs: estimatedDuration(input.prompt, isAdminWallet(input.wallet)),
+    estimatedDurationMs: estimatedDuration(input.prompt),
     startedAt: null,
     readyAt: null,
     createdAt: now,
@@ -434,7 +432,7 @@ export async function completeJob(input: { jobId: string; workerId: string; auth
     if (job.status !== "running" || !assignedIds(job).includes(input.workerId) || worker?.authToken !== input.authToken) {
       throw new Error("This worker is not assigned to that job");
     }
-    if (job.readyAt && now < job.readyAt && !isAdminWallet(job.wallet)) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
+    if (job.readyAt && now < job.readyAt) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
     const completed = Array.from(new Set([...completedIds(job), input.workerId]));
     const participants = assignedIds(job);
     const done = participants.every((id) => completed.includes(id));
@@ -454,7 +452,7 @@ export async function completeJob(input: { jobId: string; workerId: string; auth
     if (!job) throw new Error("Job not found");
     const worker = data.workers.find((w) => w.id === input.workerId);
     if (job.status !== "running" || !assignedIds(job).includes(input.workerId) || worker?.authToken !== input.authToken) throw new Error("This worker is not assigned to that job");
-    if (job.readyAt && now < job.readyAt && !isAdminWallet(job.wallet)) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
+    if (job.readyAt && now < job.readyAt) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
     const participants = assignedIds(job);
     job.completedWorkerIds = Array.from(new Set([...completedIds(job), input.workerId]));
     const done = participants.every((id) => job.completedWorkerIds.includes(id));
@@ -481,7 +479,7 @@ export async function completeManagedJob(jobId: string, proof: string) {
     if (job.status === "done") return job;
     const participants = assignedIds(job);
     if (job.status !== "running" || !participants.length) throw new Error("Task is waiting for an available worker");
-    if (job.readyAt && now < job.readyAt && !isAdminWallet(job.wallet)) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
+    if (job.readyAt && now < job.readyAt) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
     const workers = (await db.collection("workers").find({ id: { $in: participants } }).toArray()) as unknown as WorkerDoc[];
     if (!workers.some((worker) => worker.wallet)) throw new Error("Assigned workers have no payout wallet");
     const claimed = await db.collection("jobs").findOneAndUpdate(
@@ -503,7 +501,7 @@ export async function completeManagedJob(jobId: string, proof: string) {
     if (job.status === "done") return job;
     const participants = assignedIds(job);
     if (job.status !== "running" || !participants.length) throw new Error("Task is waiting for an available worker");
-    if (job.readyAt && now < job.readyAt && !isAdminWallet(job.wallet)) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
+    if (job.readyAt && now < job.readyAt) throw new Error(`Processing window has ${Math.ceil((job.readyAt - now) / 1000)} seconds remaining`);
     const workers = data.workers.filter((item) => participants.includes(item.id) && item.wallet);
     if (!workers.length) throw new Error("Assigned workers have no payout wallet");
     job.status = "done"; job.proof = proof; job.completedWorkerIds = participants; job.progress = 100; job.updatedAt = now;
@@ -536,6 +534,24 @@ export async function killJob(jobId: string) {
     data.workers.filter((worker) => assignedIds(job).includes(worker.id)).forEach((worker) => { worker.status = "idle"; worker.jobId = null; });
     const assigned = assign(data.jobs, data.workers, now);
     await writeFileStore({ ...assigned, ledger: data.ledger });
+    return job;
+  });
+}
+
+export async function expediteJob(jobId: string) {
+  const now = Date.now();
+  const db = await mongoDb();
+  if (db) {
+    const result = await db.collection("jobs").findOneAndUpdate({ id: jobId, status: "running" }, { $set: { readyAt: now, updatedAt: now } }, { returnDocument: "after" });
+    if (!result) throw new Error("Only running tasks can be sped up");
+    return result as unknown as JobDoc;
+  }
+  return withFileLock(async () => {
+    const data = await readFileStore();
+    const job = data.jobs.find((item) => item.id === jobId);
+    if (!job || job.status !== "running") throw new Error("Only running tasks can be sped up");
+    job.readyAt = now; job.updatedAt = now;
+    await writeFileStore(data);
     return job;
   });
 }

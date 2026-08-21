@@ -36,7 +36,7 @@ export function ImageComingSoon() {
   };
 
   return <Panel className="group h-full overflow-hidden p-0 md:p-0">
-    <div className="border-b border-ivory/[.08] bg-[#0a0d0b] p-6 md:p-8">
+    <div className="border-b border-ivory/[.08] p-6 md:p-8">
       <div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Create visuals</p><h2 className="mt-2 text-2xl font-medium tracking-[-.03em] text-ivory">Image studio</h2></div><div className="rounded-xl border border-gold/20 bg-gold/10 p-3 text-gold"><ImageIcon size={22}/></div></div>
       <p className="mt-3 text-sm leading-relaxed text-stone">Turn a prompt into an image while rewarding a randomly matched online worker.</p>
     </div>

@@ -17,9 +17,9 @@ export async function POST(req: Request) {
   const earnings = await getEarnings(wallet);
   if (!earnings.availableLamports) return NextResponse.json({ error: "Nothing to claim yet." }, { status: 400 });
   try {
-    const sig = await payFromEscrow(wallet, earnings.availableLamports);
-    await recordPayout({ id: crypto.randomUUID(), wallet, lamports: earnings.availableLamports, kind: "payout", jobId: null, sig, createdAt: Date.now() });
-    return NextResponse.json({ signature: sig });
+    const payout = await payFromEscrow(wallet, earnings.availableLamports);
+    await recordPayout({ id: crypto.randomUUID(), wallet, lamports: payout.lamports, kind: "payout", jobId: null, sig: payout.signature, createdAt: Date.now() });
+    return NextResponse.json({ signature: payout.signature, lamports: payout.lamports, partial: payout.partial, remainingLamports: Math.max(0, earnings.availableLamports - payout.lamports) });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown settlement error";
     const safe = detail.includes("ESCROW_SECRET_KEY") || detail.startsWith("Escrow has") ? detail : `Solana payout failed: ${detail}`;

@@ -65,20 +65,20 @@ p {
   }
 
   .panel {
-    background: rgba(8, 11, 9, .91);
+    background: rgba(5, 7, 6, .9);
     border: 1px solid rgba(255, 255, 255, 0.085);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 24px 80px rgba(0,0,0,.18);
-    backdrop-filter: blur(18px);
-    transition: border-color .3s ease, transform .3s ease, box-shadow .3s ease;
+    box-shadow: none;
+    backdrop-filter: blur(10px);
+    transition: border-color .2s ease;
   }
 
   .panel:hover {
     border-color: rgba(255,255,255,.13);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.055), 0 28px 90px rgba(0,0,0,.25);
+    box-shadow: none;
   }
 
   .field {
-    @apply rounded-xl border border-ivory/10 bg-black/20 px-4 py-3 text-sm text-ivory outline-none placeholder:text-stone/50 transition;
+    @apply border border-ivory/10 bg-black/20 px-4 py-3 text-sm text-ivory outline-none placeholder:text-stone/50 transition;
   }
 
   .field:hover { border-color: rgba(255,255,255,.16); }
@@ -93,6 +93,8 @@ p {
     background: rgba(163, 255, 111, 0.35);
   }
 }
+
+.rounded-sm, .rounded-lg, .rounded-xl, .rounded-2xl { border-radius: 0 !important; }
 
 .square-grid {
   background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
@@ -135,7 +137,7 @@ p {
 .wallet-adapter-modal {
   background: #121214 !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 4px !important;
+  border-radius: 0 !important;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55) !important;
 }
 
@@ -147,7 +149,7 @@ p {
 .wallet-adapter-modal-list li {
   background: rgba(255, 255, 255, 0.02) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 4px !important;
+  border-radius: 0 !important;
 }
 
 .wallet-adapter-modal-list .wallet-adapter-button {
