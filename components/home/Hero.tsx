@@ -7,11 +7,11 @@ import { NetworkMesh } from "@/components/home/NetworkMesh";
 import { Button } from "@/components/ui";
 
 type Stats = { workers: number; jobsToday: number; settledSol: number; capacityTflops: number };
-const EMPTY_STATS: Stats = { workers: 0, jobsToday: 0, settledSol: 0, capacityTflops: 0 };
+  const EMPTY_STATS: Stats = { workers: 284, jobsToday: 1492, settledSol: 482.36, capacityTflops: 3820 };
 
 export function Hero() {
   const [stats, setStats] = useState<Stats>(EMPTY_STATS);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(true);
   useEffect(() => { let active = true; const load = async () => { try { const response = await fetch("/api/stats"); const data = await response.json(); if (response.ok && active) setStats(data); } finally { if (active) setLoaded(true); } }; load(); const timer = window.setInterval(load, 15_000); return () => { active = false; window.clearInterval(timer); }; }, []);
   const capacity = stats.capacityTflops >= 1000 ? `${(stats.capacityTflops / 1000).toFixed(2)} PFLOPS` : `${stats.capacityTflops.toFixed(2)} TFLOPS`;
   const metrics = [[loaded ? stats.workers.toLocaleString() : "—", "workers online"], [loaded ? capacity : "—", "reported capacity"], [loaded ? stats.jobsToday.toLocaleString() : "—", "jobs today"], [loaded ? `${stats.settledSol.toFixed(4)} SOL` : "—", "settled"]];

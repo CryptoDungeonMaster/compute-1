@@ -11,6 +11,8 @@
   --elevated: #0d0f0e;
 }
 
+html { scroll-behavior: smooth; }
+
 html,
 body {
   background: var(--bg);
@@ -101,6 +103,11 @@ p {
   background-size: 72px 72px;
   mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.72) 68%, transparent 100%);
 }
+
+.market-row:hover { border-color: rgba(0,232,121,.38); }
+.market-row:hover span:nth-child(4), .market-row:hover span:nth-child(5) { color: #37F59A; }
+
+select option { color: #f3f5f4; }
 
 @keyframes compute-flow {
   from { transform: translateX(-120%); opacity: 0; }
